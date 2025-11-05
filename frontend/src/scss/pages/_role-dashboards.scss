@@ -1,0 +1,279 @@
+// Role-specific dashboard styles
+// Responsive design for admin, judger, and reporter dashboards
+
+.page-header {
+	margin-bottom: 24px;
+	
+	h1 {
+		margin: 0;
+		font-size: 24px;
+		font-weight: 600;
+		color: #1f2937;
+		
+		@media( max-width: $sm ){
+			font-size: 20px;
+		}
+	}
+	
+	p {
+		margin: 4px 0 0 0;
+		color: #6b7280;
+		font-size: 14px;
+	}
+}
+
+// Form layouts
+.ant-form {
+	.ant-row {
+		@media( max-width: $sm ){
+			.ant-col {
+				margin-bottom: 16px;
+			}
+		}
+	}
+}
+
+// Card layouts
+.ant-card {
+	@media( max-width: $sm ){
+		margin-bottom: 16px;
+	}
+}
+
+// Statistics items
+.stat-item {
+	text-align: center;
+	padding: 16px 0;
+	
+	.stat-value {
+		font-size: 24px;
+		font-weight: 600;
+		color: #1f2937;
+		margin-bottom: 4px;
+		
+		@media( max-width: $sm ){
+			font-size: 20px;
+		}
+	}
+	
+	.stat-label {
+		font-size: 12px;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+}
+
+// Template cards
+.template-card {
+	text-align: center;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	height: 100%;
+	
+	&:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+	}
+	
+	.template-icon {
+		font-size: 32px;
+		margin-bottom: 16px;
+		color: #1890ff;
+		
+		@media( max-width: $sm ){
+			font-size: 24px;
+			margin-bottom: 12px;
+		}
+	}
+	
+	h4 {
+		margin: 0 0 8px 0;
+		font-size: 16px;
+		font-weight: 600;
+		color: #1f2937;
+		
+		@media( max-width: $sm ){
+			font-size: 14px;
+		}
+	}
+	
+	p {
+		margin: 0 0 16px 0;
+		color: #6b7280;
+		font-size: 14px;
+		
+		@media( max-width: $sm ){
+			font-size: 12px;
+		}
+	}
+}
+
+// Criteria sections
+.criteria-section {
+	.criteria-header {
+		margin-bottom: 24px;
+		
+		h3 {
+			margin: 0 0 8px 0;
+			font-size: 18px;
+			font-weight: 600;
+			color: #1f2937;
+			
+			@media( max-width: $sm ){
+				font-size: 16px;
+			}
+		}
+		
+		p {
+			margin: 0;
+			color: #6b7280;
+			font-size: 14px;
+		}
+	}
+	
+	.criterion-item {
+		margin-bottom: 16px;
+		padding: 16px;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		background-color: #f9fafb;
+		
+		@media( max-width: $sm ){
+			padding: 12px;
+		}
+	}
+	
+	.criteria-actions {
+		margin-top: 16px;
+		text-align: center;
+	}
+	
+	.criteria-summary {
+		margin-top: 16px;
+	}
+}
+
+// Submission info
+.submission-info {
+	margin-bottom: 16px;
+	
+	h3 {
+		margin: 0 0 12px 0;
+		font-size: 20px;
+		font-weight: 600;
+		color: #1f2937;
+		
+		@media( max-width: $sm ){
+			font-size: 18px;
+		}
+	}
+	
+	p {
+		margin: 4px 0;
+		color: #6b7280;
+		font-size: 14px;
+	}
+}
+
+// Preview content
+.preview-content {
+	padding: 16px;
+	background-color: #f9fafb;
+	border-radius: 8px;
+	
+	h3 {
+		margin: 0 0 16px 0;
+		font-size: 18px;
+		font-weight: 600;
+		color: #1f2937;
+	}
+	
+	p {
+		margin: 8px 0;
+		color: #6b7280;
+		font-size: 14px;
+	}
+}
+
+// Role switcher
+.role-switcher {
+	padding: 10px 24px;
+	margin-bottom: 15px;
+	
+	@media( max-width: $sm ){
+		padding: 8px 16px;
+		margin-bottom: 10px;
+	}
+	
+	.ant-radio-group {
+		@media( max-width: $sm ){
+			.ant-radio-button-wrapper {
+				padding: 4px 8px;
+				font-size: 12px;
+			}
+		}
+	}
+}
+
+// Sidebar responsive improvements
+.sider-primary {
+	@media( max-width: $lg ){
+		.brand {
+			.brand-primary {
+				font-size: 18px;
+			}
+			.brand-secondary {
+				font-size: 12px;
+			}
+		}
+	}
+}
+
+// List items
+.ant-list-item {
+	@media( max-width: $sm ){
+		padding: 8px 0;
+	}
+}
+
+// Button groups
+.ant-btn-group {
+	@media( max-width: $sm ){
+		.ant-btn {
+			padding: 4px 8px;
+			font-size: 12px;
+		}
+	}
+}
+
+// Form items
+.ant-form-item {
+	@media( max-width: $sm ){
+		margin-bottom: 16px;
+	}
+}
+
+// Tables
+.ant-table {
+	@media( max-width: $sm ){
+		font-size: 12px;
+		
+		.ant-table-thead > tr > th {
+			padding: 8px 4px;
+		}
+		
+		.ant-table-tbody > tr > td {
+			padding: 8px 4px;
+		}
+	}
+}
+
+// Charts
+.ant-card {
+	.chart-container {
+		@media( max-width: $sm ){
+			height: 200px;
+		}
+	}
+}

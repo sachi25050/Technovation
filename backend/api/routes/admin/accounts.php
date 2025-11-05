@@ -1,0 +1,251 @@
+<?php
+/**
+ * Admin - Accounts Management
+ */
+
+$db = Database::getInstance()->getConnection();
+$user = Auth::getCurrentUser();
+
+// Check authentication
+if (!$user) {
+    Response::unauthorized('Authentication required');
+}
+
+// Check admin role
+if ($user['role'] !== 'admin') {
+    Response::forbidden('Admin access required');
+}
+
+$method = $_SERVER['REQUEST_METHOD'];
+$input = json_decode(file_get_contents('php://input'), true);
+
+// Get ID from URI if present
+$id = isset($_GET['_params'][0]) ? (int)$_GET['_params'][0] : (isset($_GET['params'][0]) ? (int)$_GET['params'][0] : null);
+
+switch ($method) {
+    case 'GET':
+        if ($id) {
+            // Get single account
+            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            $account = $stmt->fetch();
+            
+            if (!$account) {
+                Response::notFound('Account not found');
+            }
+            
+            Response::success('Account retrieved', $account);
+        } else {
+            // Get all accounts with pagination
+            $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+            $offset = ($page - 1) * $limit;
+            $role = $_GET['role'] ?? '';
+            
+            $where = "1=1";
+            $params = [];
+            
+            if ($role) {
+                $where .= " AND role = ?";
+                $params[] = $role;
+            }
+            
+            // Get total count
+            $countStmt = $db->prepare("SELECT COUNT(*) as total FROM users WHERE $where");
+            $countStmt->execute($params);
+            $total = $countStmt->fetch()['total'];
+            
+            // Get accounts
+            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?");
+            $params[] = $limit;
+            $params[] = $offset;
+            $stmt->execute($params);
+            $accounts = $stmt->fetchAll();
+            
+            Response::success('Accounts retrieved', [
+                'data' => $accounts,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => $total,
+                    'pages' => ceil($total / $limit)
+                ]
+            ]);
+        }
+        break;
+        
+    case 'POST':
+        // Create new account
+        $username = $input['username'] ?? '';
+        $email = $input['email'] ?? '';
+        $password = $input['password'] ?? '';
+        $firstName = $input['first_name'] ?? '';
+        $lastName = $input['last_name'] ?? '';
+        $role = $input['role'] ?? '';
+        
+        // Validation
+        $errors = [];
+        if (empty($username)) $errors['username'] = 'Username is required';
+        if (empty($email)) $errors['email'] = 'Email is required';
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors['email'] = 'Invalid email format';
+        if (empty($password)) $errors['password'] = 'Password is required';
+        if (strlen($password) < 6) $errors['password'] = 'Password must be at least 6 characters';
+        if (!in_array($role, ['admin', 'judger', 'reporter'])) $errors['role'] = 'Invalid role';
+        
+        if (!empty($errors)) {
+            Response::validationError($errors);
+        }
+        
+        // Check if username or email already exists
+        $checkStmt = $db->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
+        $checkStmt->execute([$username, $email]);
+        if ($checkStmt->fetch()) {
+            Response::error('Username or email already exists', null, 409);
+        }
+        
+        // Hash password
+        $hashedPassword = Auth::hashPassword($password);
+        
+        // Insert user
+        $stmt = $db->prepare("INSERT INTO users (username, email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$username, $email, $hashedPassword, $firstName, $lastName, $role]);
+        $userId = $db->lastInsertId();
+        
+        // Get created user
+        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $account = $stmt->fetch();
+        
+        Response::success('Account created successfully', $account, 201);
+        break;
+        
+    case 'PUT':
+        // Update account
+        if (!$id) {
+            Response::error('Account ID is required', null, 400);
+        }
+        
+        $username = $input['username'] ?? null;
+        $email = $input['email'] ?? null;
+        $password = $input['password'] ?? null;
+        $firstName = $input['first_name'] ?? null;
+        $lastName = $input['last_name'] ?? null;
+        $role = $input['role'] ?? null;
+        $status = $input['status'] ?? null;
+        
+        // Check if account exists
+        $checkStmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+        $checkStmt->execute([$id]);
+        if (!$checkStmt->fetch()) {
+            Response::notFound('Account not found');
+        }
+        
+        // Build update query
+        $updates = [];
+        $params = [];
+        
+        if ($username !== null) {
+            // Check if username already taken
+            $checkStmt = $db->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+            $checkStmt->execute([$username, $id]);
+            if ($checkStmt->fetch()) {
+                Response::error('Username already taken', null, 409);
+            }
+            $updates[] = "username = ?";
+            $params[] = $username;
+        }
+        
+        if ($email !== null) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                Response::validationError(['email' => 'Invalid email format']);
+            }
+            // Check if email already taken
+            $checkStmt = $db->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+            $checkStmt->execute([$email, $id]);
+            if ($checkStmt->fetch()) {
+                Response::error('Email already taken', null, 409);
+            }
+            $updates[] = "email = ?";
+            $params[] = $email;
+        }
+        
+        if ($password !== null) {
+            if (strlen($password) < 6) {
+                Response::validationError(['password' => 'Password must be at least 6 characters']);
+            }
+            $updates[] = "password = ?";
+            $params[] = Auth::hashPassword($password);
+        }
+        
+        if ($firstName !== null) {
+            $updates[] = "first_name = ?";
+            $params[] = $firstName;
+        }
+        
+        if ($lastName !== null) {
+            $updates[] = "last_name = ?";
+            $params[] = $lastName;
+        }
+        
+        if ($role !== null) {
+            if (!in_array($role, ['admin', 'judger', 'reporter'])) {
+                Response::validationError(['role' => 'Invalid role']);
+            }
+            $updates[] = "role = ?";
+            $params[] = $role;
+        }
+        
+        if ($status !== null) {
+            if (!in_array($status, ['active', 'inactive'])) {
+                Response::validationError(['status' => 'Invalid status']);
+            }
+            $updates[] = "status = ?";
+            $params[] = $status;
+        }
+        
+        if (empty($updates)) {
+            Response::error('No fields to update', null, 400);
+        }
+        
+        $params[] = $id;
+        $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        
+        // Get updated user
+        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE id = ?");
+        $stmt->execute([$id]);
+        $account = $stmt->fetch();
+        
+        Response::success('Account updated successfully', $account);
+        break;
+        
+    case 'DELETE':
+        // Delete account
+        if (!$id) {
+            Response::error('Account ID is required', null, 400);
+        }
+        
+        // Check if account exists
+        $checkStmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+        $checkStmt->execute([$id]);
+        if (!$checkStmt->fetch()) {
+            Response::notFound('Account not found');
+        }
+        
+        // Soft delete (set status to inactive) or hard delete
+        // For safety, we'll do soft delete
+        $stmt = $db->prepare("UPDATE users SET status = 'inactive' WHERE id = ?");
+        $stmt->execute([$id]);
+        
+        // Or hard delete (uncomment if needed):
+        // $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
+        // $stmt->execute([$id]);
+        
+        Response::success('Account deleted successfully');
+        break;
+        
+    default:
+        Response::error('Method not allowed', null, 405);
+}
+

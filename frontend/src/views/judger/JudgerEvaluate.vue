@@ -1,0 +1,3905 @@
+Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Criteria	Allocated	Achieved<!-- 
+	Judger Evaluate - LankaPay Technnovation Awards Judging System UI
+	Matching the exact design from the provided image
+ -->
+
+<template>
+	<div class="judging-system">
+		<!-- Main Content -->
+		<div class="main-content">
+			<div class="content-container">
+				<!-- A. General Details Section -->
+				
+					<div class="filter-section">
+					<div class="section-header">
+						<h2>General Details</h2>
+					</div>
+					<div class="section-content">
+						<div class="form-row">
+							<div class="form-field judge-field">
+								<label>Name of the Judge</label>
+								<a-input v-model="judgeName" placeholder="Mr. Asita D B Talwatta" readonly />
+							</div>
+							<div class="form-field institute-field">
+								<label>Institute Name</label>
+								<a-select v-model="selectedInstitute" placeholder="Select Institute" @change="onInstituteChange">
+									<a-select-option value="bank-ceylon">Bank of Ceylon</a-select-option>
+									<a-select-option value="commercial-bank">Commercial Bank of Ceylon PLC</a-select-option>
+									<a-select-option value="peoples-bank">People's Bank</a-select-option>
+									<a-select-option value="sampath-bank">Sampath Bank PLC</a-select-option>
+									<a-select-option value="hatton-national">Hatton National Bank PLC</a-select-option>
+									<a-select-option value="ndb-bank">NDB Bank</a-select-option>
+								</a-select>
+							</div>
+						</div>
+						<div class="form-row award-row">
+							<div class="form-field award-field">
+								<label>Award Category</label>
+								<a-select v-model="selectedAward" placeholder="Select Award Category" @change="onAwardChange">
+									<a-select-option value="award-14">Award No. 14 - Financial Institution of the Year for Best Digital Payment</a-select-option>
+									<a-select-option value="award-6a">Award No. 6A - Most Popular Digital Payment Product - State Banks</a-select-option>
+									<a-select-option value="award-6b">Award No. 6B - Most Popular Digital Payment Product - Private Banks</a-select-option>
+									<a-select-option value="award-7">Award No. 7 - Best Digital Payment Innovation</a-select-option>
+									<a-select-option value="award-8">Award No. 8 - Best Digital Payment Security</a-select-option>
+								</a-select>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Award Category / Marking Criteria Placeholder Section -->
+				<div class="marking-criteria-placeholder" v-if="!selectedInstitute || !selectedAward">
+					<div class="placeholder-content">
+						<p><strong>Award Category</strong> - Please Select the Institute Name and Award Category</p>
+						<p><strong>Marking Criteria</strong> - Please Select the Institute Name and Award Category</p>
+					</div>
+				</div>
+
+				<!-- Dynamic Marking Criteria Section -->
+				<div class="marking-criteria-section" v-if="selectedInstitute && selectedAward">
+					<h3 class="section-title">Marking Criteria</h3>
+					<div class="criteria-content">
+						<p><strong>Award Category:</strong> {{ getAwardName(selectedAward) }}</p>
+						<p><strong>Marking Criteria:</strong> Standard Evaluation Criteria for {{ getInstituteName(selectedInstitute) }}</p>
+					</div>
+				</div>
+
+				<!-- B. Presentation Marks Section -->
+				<div class="presentation-marks-section">
+					<div class="section-header">
+						<h2>Presentation Marks</h2>
+					</div>
+					<div class="modern-marks-container">
+						<div class="modern-table-wrapper">
+							<table class="modern-marks-table">
+							<thead>
+								<tr>
+										<th class="criteria-header">Marking Criteria</th>
+										<th class="allocated-header">Allocated</th>
+										<th class="achieved-header">Achieved</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="(criterion, index) in markingCriteria" :key="index" 
+										:class="{ 
+											'even-row': index % 2 === 0, 
+											'error-row': !selectedInstitute || !selectedAward,
+											'criteria-row': true
+										}">
+									<td class="criteria-name">
+											<span class="criteria-text">
+										{{ selectedInstitute && selectedAward ? criterion.name : 'Marking Field 0' + (index + 1) + ' - Please Select the Institute Name and Award Category' }}
+											</span>
+									</td>
+									<td class="allocated-marks">
+											<span class="allocated-value">
+										{{ selectedInstitute && selectedAward ? criterion.allocated : (index === 4 ? '100%' : '0') }}
+											</span>
+									</td>
+									<td class="achieved-marks">
+										<a-input-number
+											v-if="selectedInstitute && selectedAward"
+											v-model="criterion.marks"
+											:min="0"
+											:max="criterion.allocated"
+											@change="updateTotal"
+												class="modern-marks-input"
+											placeholder="0"
+										/>
+										<span v-else class="placeholder-dash">-</span>
+									</td>
+								</tr>
+								<!-- Total Row - After Overall Performance -->
+								<tr class="total-row" v-if="selectedInstitute && selectedAward">
+										<td class="total-label">
+											<span class="total-text">Total</span>
+										</td>
+										<td class="total-allocated">
+											<span class="total-value">{{ totalAllocated }}%</span>
+										</td>
+										<td class="total-achieved">
+											<span class="total-value">{{ totalMarks }}</span>
+										</td>
+								</tr>
+								<!-- Gap Row -->
+								<tr class="gap-row" v-if="selectedInstitute && selectedAward">
+									<td colspan="3"></td>
+								</tr>
+								<!-- Presentation Weightage Row -->
+								<tr class="weightage-row" v-if="selectedInstitute && selectedAward">
+									<td class="criteria-name">
+										<span class="criteria-text">
+											Score for the Presentation (Weightage for Total is <span class="weightage-label">{{ formatWeightage(presentationWeightage) }}</span>)
+										</span>
+									</td>
+									<td class="allocated-marks">
+										<span class="allocated-value">100%</span>
+									</td>
+									<td class="achieved-marks">
+										<span class="weightage-value">{{ calculatePresentationScore() }}</span>
+									</td>
+								</tr>
+								<!-- Preliminary Weightage Row -->
+								<tr class="weightage-row" v-if="selectedInstitute && selectedAward">
+									<td class="criteria-name">
+										<span class="criteria-text">
+											Preliminary Volume Wise Score (Weighted <span class="weightage-label">{{ formatWeightage(preliminaryWeightage) }}</span>)
+										</span>
+									</td>
+									<td class="allocated-marks">
+										<span class="allocated-value">-</span>
+									</td>
+									<td class="achieved-marks">
+										<span class="weightage-value">{{ calculateVolumeWiseScore() }}</span>
+									</td>
+								</tr>
+								<!-- Aggregate Score Row -->
+								<tr class="aggregate-row" v-if="selectedInstitute && selectedAward">
+									<td class="criteria-name">
+										<span class="criteria-text">
+											Aggregated Score (Presentation - <span class="weightage-label">{{ formatWeightage(presentationWeightage) }}</span> + Volume Wise - <span class="weightage-label">{{ formatWeightage(preliminaryWeightage) }}</span>)
+										</span>
+									</td>
+									<td class="allocated-marks">
+										<span class="allocated-value">-</span>
+									</td>
+									<td class="achieved-marks">
+										<span class="aggregate-value">{{ calculateAggregateScore() }}</span>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+						</div>
+						<div v-if="totalMarks !== 100 && selectedInstitute && selectedAward" class="modern-warning">
+							<div class="warning-icon">⚠️</div>
+							<span class="warning-text">Total marks must equal 100%</span>
+					</div>
+						</div>
+					<div class="modern-action-buttons">
+						<div class="button-group left-group">
+							<button class="modern-btn btn-exit" @click="exitApplication">
+								<span class="btn-icon">✖️</span>
+								<span class="btn-text">Exit</span>
+							</button>
+							<button class="modern-btn btn-delete" @click="deleteData">
+								<span class="btn-icon">🗑️</span>
+								<span class="btn-text">Delete</span>
+							</button>
+						</div>
+						<div class="button-group right-group">
+							<button class="modern-btn btn-remove-filter" @click="removeFilter">
+								<span class="btn-icon">📥</span>
+								<span class="btn-text">Remove Filter</span>
+							</button>
+							<button class="modern-btn btn-load" @click="loadData">
+								<span class="btn-icon">📥</span>
+								<span class="btn-text">Load</span>
+							</button>
+							<button class="modern-btn btn-reset" @click="resetForm">
+								<span class="btn-icon">🔄</span>
+								<span class="btn-text">Reset</span>
+							</button>
+							<button 
+								class="modern-btn btn-submit" 
+								@click="submitMarks"
+								:disabled="!canSubmit"
+							>
+								<span class="btn-icon">📤</span>
+								<span class="btn-text">Submit</span>
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- C. Filter Section -->
+				<div class="filter-section">
+					<div class="filter-content">
+						<div class="filter-row">
+							<label>Award Category Filter</label>
+							<a-select 
+								v-model="categoryFilter" 
+								placeholder="Select Award Category"
+								class="filter-select award-filter-full"
+								@change="filterSummary"
+							>
+								<a-select-option value="">All Categories</a-select-option>
+								<a-select-option value="award-14">Award No. 14 - Financial Institution of the Year</a-select-option>
+								<a-select-option value="award-6a">Award No. 6A - Most Popular Digital Payment Product - State Banks</a-select-option>
+								<a-select-option value="award-6b">Award No. 6B - Most Popular Digital Payment Product - Private Banks</a-select-option>
+								<a-select-option value="award-7">Award No. 7 - Best Digital Payment Innovation</a-select-option>
+								<a-select-option value="award-8">Award No. 8 - Best Digital Payment Security</a-select-option>
+							</a-select>
+						</div>
+						<div class="filter-row">
+							<label>Institute Filter</label>
+							<a-select 
+								v-model="instituteFilter" 
+								placeholder="Select Institute"
+								class="filter-select institute-filter-full"
+								@change="filterSummary"
+							>
+								<a-select-option value="">All Institutes</a-select-option>
+								<a-select-option value="bank-ceylon">Bank of Ceylon</a-select-option>
+								<a-select-option value="commercial-bank">Commercial Bank of Ceylon PLC</a-select-option>
+								<a-select-option value="peoples-bank">People's Bank</a-select-option>
+								<a-select-option value="sampath-bank">Sampath Bank PLC</a-select-option>
+								<a-select-option value="hatton-national">Hatton National Bank PLC</a-select-option>
+								<a-select-option value="ndb-bank">NDB Bank</a-select-option>
+							</a-select>
+						</div>
+					</div>
+				</div>
+
+				<!-- D. Summary Section (Marking Sheet) -->
+				<div class="summary-section">
+					<div class="summary-header">
+						<h6>{{ judgeName }} - Marking Sheet</h6>
+					</div>
+					<div class="modern-table-wrapper">
+						<div class="table-container">
+							<table class="modern-evaluation-table">
+								<thead class="table-header">
+									<tr>
+										<th class="checkbox-column"></th>
+										<th class="institute-column">Institute Name</th>
+										<th class="award-column">Award Category</th>
+										<th class="criteria-column">C-01</th>
+										<th class="criteria-column">C-02</th>
+										<th class="criteria-column">C-03</th>
+										<th class="criteria-column">C-04</th>
+										<th class="criteria-column">C-05</th>
+										<th class="presentation-column">Presentation</th>
+										<th class="overall-column">Action</th>
+								</tr>
+							</thead>
+								<tbody class="table-body">
+									<tr 
+										v-for="(entry, index) in filteredSummaryData" 
+										:key="index"
+										:class="{ 'selected-row': selectedRowIndex === index }"
+										class="evaluation-row"
+										:tabindex="0"
+										:aria-selected="selectedRowIndex === index"
+										@click="selectRow(index)"
+										@keydown.space.prevent="selectRow(index)"
+										@keydown.enter.prevent="selectRow(index)">
+										<td class="checkbox-cell">
+											<input 
+												type="checkbox"
+												:checked="selectedRowIndex === index"
+												@click.stop="selectRow(index)"
+												@change="handleCheckboxChange(index)"
+												class="evaluation-checkbox"
+												:aria-label="`Select ${entry.institute} for evaluation`"
+												:aria-describedby="`row-${index}-description`"
+											/>
+										</td>
+										<td class="institute-cell" :id="`row-${index}-description`">
+											<span class="institute-name">{{ entry.institute }}</span>
+										</td>
+										<td class="award-cell">
+											<span class="award-text">{{ entry.award }}</span>
+										</td>
+										<td class="criteria-cell">{{ entry.c1 }}</td>
+										<td class="criteria-cell">{{ entry.c2 }}</td>
+										<td class="criteria-cell">{{ entry.c3 }}</td>
+										<td class="criteria-cell">{{ entry.c4 }}</td>
+										<td class="criteria-cell">{{ entry.c5 }}</td>
+										<td class="presentation-cell">
+											<div class="presentation-score-container" :data-score="getScoreRange(entry.presentation)">
+												<span class="presentation-score-value">{{ entry.presentation }}</span>
+												<div class="presentation-progress-bar">
+													<div class="progress-fill" :style="{ width: (entry.presentation / 100 * 100) + '%' }"></div>
+												</div>
+											</div>
+										</td>
+										<td class="overall-cell">
+											<button 
+												class="edit-btn"
+												@click="editRow(index)"
+												:aria-label="`Edit entry for ${entry.institute}`"
+												title="Edit this entry">
+												Edit
+											</button>
+										</td>
+								</tr>
+							</tbody>
+						</table>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</template>
+
+<script>
+	export default ({
+		data() {
+			return {
+			// Form selections
+			judgeName: 'Mr. Asita D B Talwatta',
+			selectedInstitute: null,
+			selectedAward: null,
+			categoryFilter: '',
+			instituteFilter: '',
+			
+			// Row selection state
+			selectedRowIndex: null,
+			
+			// Weightage values
+			presentationWeightage: 0,
+			preliminaryWeightage: 0,
+			
+			// Preliminary/Volume Wise Score (this should come from API or data source)
+			// TODO: This should be fetched from API based on selectedInstitute and selectedAward
+			// For demonstration, using a default value - replace with actual API call
+			preliminaryScore: 0,
+			
+			// Marking criteria and marks
+			markingCriteria: [
+				{ name: 'Innovation & Creativity', allocated: 20, marks: null },
+				{ name: 'Technical Excellence', allocated: 25, marks: null },
+				{ name: 'Impact & Relevance', allocated: 25, marks: null },
+				{ name: 'Presentation & Documentation', allocated: 20, marks: null },
+				{ name: 'Overall Performance', allocated: 10, marks: null }
+			],
+				
+				// Summary data matching the image
+				summaryData: [
+					{
+						institute: 'Bank of Ceylon',
+						award: 'Award No. 14 - Financial Institution of the Year for Best Digital Pay...',
+						c1: 10,
+						c2: 10,
+						c3: 10,
+						c4: 10,
+						c5: 10,
+						presentation: 100,
+						overall: 100
+					},
+					{
+						institute: 'Commercial Bank of Ceylon PLC',
+						award: 'Award No. 14 - Financial Institution of the Year for Best Digital Pa...',
+						c1: 10,
+						c2: 10,
+						c3: 10,
+						c4: 10,
+						c5: 10,
+						presentation: 50,
+						overall: 50
+					},
+					{
+						institute: 'Bank of Ceylon',
+						award: 'Award No. 6A - Most Popular Digital Payment Product - State Banks',
+						c1: 15,
+						c2: 20,
+						c3: 10,
+						c4: 15,
+						c5: 5,
+						presentation: 85,
+						overall: 8.5
+					}
+				]
+			}
+		},
+		computed: {
+			totalMarks() {
+				return this.markingCriteria.reduce((total, criterion) => {
+					return total + (criterion.marks || 0);
+				}, 0);
+			},
+			totalAllocated() {
+				return this.markingCriteria.reduce((total, criterion) => {
+					return total + criterion.allocated;
+				}, 0);
+			},
+			canSubmit() {
+				return this.selectedInstitute && 
+					   this.selectedAward && 
+					   this.totalMarks === 100 &&
+					   this.markingCriteria.every(c => c.marks !== null && c.marks > 0);
+			},
+			filteredSummaryData() {
+				let filtered = this.summaryData;
+				
+				if (this.categoryFilter) {
+					filtered = filtered.filter(entry => 
+						entry.award.toLowerCase().includes(this.categoryFilter.toLowerCase())
+					);
+				}
+				
+				if (this.instituteFilter) {
+					filtered = filtered.filter(entry => 
+						entry.institute.toLowerCase().includes(this.instituteFilter.toLowerCase())
+					);
+				}
+				
+				return filtered;
+			}
+		},
+		methods: {
+			onInstituteChange() {
+				// Reset dependent fields when institute changes
+				this.selectedAward = null;
+				this.resetMarks();
+			},
+			onAwardChange() {
+				// Reset marks when award changes
+				this.resetMarks();
+				// Fetch award data including weightages
+				this.fetchAwardWeightages();
+			},
+			fetchAwardWeightages() {
+				if (!this.selectedAward) {
+					this.presentationWeightage = 0;
+					this.preliminaryWeightage = 0;
+					return;
+				}
+				
+				// Map award value to award ID or fetch from API
+				// For now, we'll fetch all awards and find the matching one
+				const token = localStorage.getItem('token');
+				fetch('http://localhost/backend/api/admin/awards', {
+					method: 'GET',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${token}`
+					}
+				})
+				.then(response => response.json())
+				.then(data => {
+					if (data.success && data.data) {
+						// Find award by matching category name
+						const awardName = this.getAwardName(this.selectedAward);
+						const award = data.data.find(a => 
+							a.category && a.category.toLowerCase().includes(awardName.toLowerCase().substring(0, 20))
+						);
+						
+						if (award) {
+							this.presentationWeightage = parseFloat(award.presentation_weightage) || 0;
+							this.preliminaryWeightage = parseFloat(award.preliminary_weightage) || 0;
+							// TODO: Fetch preliminaryScore from API based on selectedInstitute and selectedAward
+							// For now, preliminaryScore remains at its default value
+						} else {
+							// Default values if not found
+							this.presentationWeightage = 10;
+							this.preliminaryWeightage = 90;
+						}
+					} else {
+						// Default values on error
+						this.presentationWeightage = 10;
+						this.preliminaryWeightage = 90;
+					}
+				})
+				.catch(error => {
+					console.error('Error fetching award weightages:', error);
+					// Default values on error
+					this.presentationWeightage = 10;
+					this.preliminaryWeightage = 90;
+				});
+			},
+			updateWeightages() {
+				// This method handles dynamic weightage updates
+				// The weightages are fetched from API when award changes
+			},
+			formatWeightage(value) {
+				if (value === null || value === undefined || value === '') {
+					return '0%';
+				}
+				const numValue = parseFloat(value) || 0;
+				return numValue.toFixed(2) + '%';
+			},
+			formatWeightageValue(value) {
+				if (value === null || value === undefined || value === '') {
+					return '0';
+				}
+				const numValue = parseFloat(value) || 0;
+				return numValue.toFixed(2);
+			},
+			calculatePresentationScore() {
+				// Calculate: totalMarks × (presentationWeightage / 100)
+				const totalMarks = this.totalMarks || 0;
+				const presentationWeightage = this.presentationWeightage || 0;
+				const presentationScore = totalMarks * (presentationWeightage / 100);
+				return presentationScore.toFixed(2);
+			},
+			calculateVolumeWiseScore() {
+				// Calculate: preliminaryScore × (preliminaryWeightage / 100)
+				// This is the Volume Wise Score weighted by preliminaryWeightage%
+				const preliminaryScore = this.preliminaryScore || 0;
+				const preliminaryWeightage = this.preliminaryWeightage || 0;
+				const volumeWiseScore = preliminaryScore * (preliminaryWeightage / 100);
+				return volumeWiseScore.toFixed(2);
+			},
+			calculateAggregateScore() {
+				// Calculate aggregate score: (Presentation - presentationWeightage%) + (Volume Wise - preliminaryWeightage%)
+				// Presentation Score = totalMarks × (presentationWeightage / 100)
+				const presentationScore = parseFloat(this.calculatePresentationScore()) || 0;
+				
+				// Volume Wise Score = preliminaryScore × (preliminaryWeightage / 100)
+				const volumeWiseScore = parseFloat(this.calculateVolumeWiseScore()) || 0;
+				
+				// Aggregate = Presentation Score + Volume Wise Score
+				const aggregate = presentationScore + volumeWiseScore;
+				return aggregate.toFixed(2);
+			},
+			updateTotal() {
+				// This method is called automatically when marks change
+				// The total is computed reactively
+			},
+			removeFilter() {
+				this.$confirm({
+					title: 'Remove Filters',
+					content: 'Are you sure you want to remove all applied filters?',
+					okText: 'Yes, Remove',
+					cancelText: 'Cancel',
+					onOk: () => {
+				this.categoryFilter = '';
+				this.instituteFilter = '';
+						this.$message.success('All filters have been removed');
+					}
+				});
+			},
+			loadData() {
+				this.$confirm({
+					title: 'Load Data',
+					content: 'This will load evaluation data from the server. Continue?',
+					okText: 'Load Data',
+					cancelText: 'Cancel',
+					onOk: () => {
+						this.$message.loading('Loading evaluation data...', 2);
+				// In a real app, this would fetch data from API
+						setTimeout(() => {
+							this.$message.success('Data loaded successfully');
+						}, 2000);
+					}
+				});
+			},
+			selectRow(index) {
+				// Toggle selection - if clicking the same row, deselect it
+				if (this.selectedRowIndex === index) {
+					this.selectedRowIndex = null;
+				} else {
+					this.selectedRowIndex = index;
+				}
+			},
+			handleCheckboxChange(index) {
+				// Sync checkbox state with row selection
+				if (this.selectedRowIndex === index) {
+					this.selectedRowIndex = null;
+				} else {
+					this.selectedRowIndex = index;
+				}
+			},
+			getScoreRange(score) {
+				// Determine score range for color coding
+				if (score >= 90) return '90-100';
+				if (score >= 80) return '80-89';
+				if (score >= 70) return '70-79';
+				if (score >= 60) return '60-69';
+				return '0-59';
+			},
+			editRow(index) {
+				// Handle edit button click
+				const entry = this.filteredSummaryData[index];
+				this.$message.info(`Editing entry for ${entry.institute}`);
+				// In a real app, this would open an edit modal or navigate to edit page
+				console.log('Edit row:', index, entry);
+			},
+			resetForm() {
+				this.$confirm({
+					title: 'Reset Form',
+					content: 'Are you sure you want to reset all form data? This action cannot be undone.',
+					okText: 'Yes, Reset',
+					cancelText: 'Cancel',
+					onOk: () => {
+				this.selectedInstitute = null;
+				this.selectedAward = null;
+				this.resetMarks();
+						this.$message.success('Form has been reset successfully');
+					}
+				});
+			},
+			resetMarks() {
+				this.markingCriteria.forEach(criterion => {
+					criterion.marks = null;
+				});
+				this.presentationWeightage = 0;
+				this.preliminaryWeightage = 0;
+			},
+			submitMarks() {
+				if (!this.canSubmit) {
+					this.$message.error('Please complete all required fields and ensure total marks equal 100%');
+					return;
+				}
+				
+				this.$confirm({
+					title: 'Submit Marks',
+					content: `Are you sure you want to submit marks for ${this.getInstituteName(this.selectedInstitute)} - ${this.getAwardName(this.selectedAward)}?`,
+					okText: 'Submit',
+					cancelText: 'Cancel',
+					onOk: () => {
+				// Add to summary data
+				const newEntry = {
+					institute: this.getInstituteName(this.selectedInstitute),
+					award: this.getAwardName(this.selectedAward),
+					c1: this.markingCriteria[0]?.marks || 0,
+					c2: this.markingCriteria[1]?.marks || 0,
+					c3: this.markingCriteria[2]?.marks || 0,
+					c4: this.markingCriteria[3]?.marks || 0,
+					c5: this.markingCriteria[4]?.marks || 0,
+					presentation: this.totalMarks,
+					overall: this.totalMarks
+				};
+				
+				this.summaryData.unshift(newEntry);
+				
+				// Show success message
+				this.$message.success(
+					`Marks successfully submitted for ${newEntry.institute} – ${newEntry.award}`
+				);
+				
+				// Reset form
+				this.resetForm();
+					}
+				});
+			},
+			exitApplication() {
+				this.$confirm({
+					title: 'Exit Application',
+					content: 'Are you sure you want to exit? Any unsaved changes will be lost.',
+					okText: 'Exit',
+					cancelText: 'Cancel',
+					onOk: () => {
+						this.$message.success('Application closed');
+						// In a real app, this would close the application or redirect
+					}
+				});
+			},
+			deleteData() {
+				this.$confirm({
+					title: 'Delete Data',
+					content: 'Are you sure you want to delete all evaluation data? This action cannot be undone.',
+					okText: 'Delete',
+					cancelText: 'Cancel',
+					onOk: () => {
+						this.summaryData = [];
+						this.$message.success('All evaluation data has been deleted');
+					}
+				});
+			},
+			filterSummary() {
+				// Filter is handled by computed property
+			},
+			getInstituteName(value) {
+				const institutes = {
+					'bank-ceylon': 'Bank of Ceylon',
+					'commercial-bank': 'Commercial Bank of Ceylon PLC',
+					'peoples-bank': 'People\'s Bank',
+					'sampath-bank': 'Sampath Bank PLC',
+					'hatton-national': 'Hatton National Bank PLC',
+					'ndb-bank': 'NDB Bank'
+				};
+				return institutes[value] || value;
+			},
+			getAwardName(value) {
+				const awards = {
+					'award-14': 'Award No. 14 - Financial Institution of the Year for Best Digital Payment',
+					'award-6a': 'Award No. 6A - Most Popular Digital Payment Product - State Banks',
+					'award-6b': 'Award No. 6B - Most Popular Digital Payment Product - Private Banks',
+					'award-7': 'Award No. 7 - Best Digital Payment Innovation',
+					'award-8': 'Award No. 8 - Best Digital Payment Security'
+				};
+				return awards[value] || value;
+			},
+		}
+	})
+</script>
+
+<style lang="scss">
+// LankaPay Technnovation Awards Judging System UI Styles
+.judging-system {
+	font-family: 'Roboto', 'Open Sans', 'Inter', sans-serif;
+	background-color: #f8f9fa;
+	min-height: 100vh;
+	color: #2C3E50;
+	width: 100%;
+	max-width: 100%;
+	overflow-x: hidden;
+	box-sizing: border-box;
+	
+	* {
+		box-sizing: border-box;
+	}
+}
+
+// Main Content - Full Width Layout
+.main-content {
+	padding: 8px;
+	min-height: calc(100vh - 120px);
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+	overflow-x: hidden;
+	background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.content-container {
+	max-width: 100%;
+	width: 100%;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	box-sizing: border-box;
+}
+
+// A. General Details Section - Full Width
+.general-details-section {
+	background: white;
+	border-radius: 8px;
+	padding: 12px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.section-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: #1E293B;
+	margin: 0 0 8px 0;
+	letter-spacing: -0.025em;
+}
+
+.section-content {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	
+	@media (min-width: 768px) {
+		gap: 16px;
+	}
+}
+
+.form-row {
+	display: flex;
+	gap: 12px;
+	
+	@media (min-width: 768px) {
+		gap: 16px;
+	}
+	
+	@media (min-width: 1024px) {
+		gap: 20px;
+	}
+	
+	@media (max-width: 767px) {
+		flex-direction: column;
+		gap: 8px;
+	}
+}
+
+.form-field {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	
+	label {
+		font-weight: 500;
+		color: #2C3E50;
+		font-size: 10px;
+	}
+}
+
+// Specific field widths - fully increased widths
+.judge-field {
+	flex: 1;
+}
+
+.institute-field {
+	flex: 1;
+}
+
+.award-field {
+	flex: 1;
+}
+
+.award-row {
+	margin-top: 8px;
+}
+
+// D. Summary Section (Marking Sheet) - Modern Design
+.summary-section {
+	background: white;
+	border-radius: 16px;
+	padding: 20px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+	
+	@media (min-width: 768px) {
+		padding: 24px;
+		border-radius: 20px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 28px;
+		border-radius: 24px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+	}
+}
+
+.summary-header {
+	margin-bottom: 20px;
+	
+	@media (min-width: 768px) {
+		margin-bottom: 24px;
+	}
+	
+	@media (min-width: 1024px) {
+		margin-bottom: 28px;
+	}
+	
+	h3 {
+		font-size: 18px;
+		font-weight: 700;
+		color: #1E293B;
+		margin: 0;
+		line-height: 1.3;
+		
+		@media (min-width: 768px) {
+			font-size: 20px;
+		}
+		
+		@media (min-width: 1024px) {
+			font-size: 22px;
+		}
+	}
+}
+
+// Modern Evaluation Table
+.modern-evaluation-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: white;
+	font-size: 13px;
+	border-radius: 12px;
+	overflow: hidden;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	
+	@media (min-width: 768px) {
+		font-size: 14px;
+	}
+	
+	@media (min-width: 1024px) {
+		font-size: 15px;
+	}
+}
+
+.table-header {
+	background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+	position: relative;
+	
+	&::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
+		background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%);
+	}
+}
+
+.modern-evaluation-table th {
+	padding: 12px 8px;
+	text-align: center;
+	font-weight: 700;
+	font-size: 13px;
+	color: #1E293B;
+	letter-spacing: 0.025em;
+	border: none;
+	background: transparent;
+	
+	@media (min-width: 768px) {
+		padding: 14px 10px;
+		font-size: 14px;
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 16px 12px;
+		font-size: 15px;
+	}
+}
+
+.checkbox-column {
+	width: 40px;
+	text-align: center;
+}
+
+.institute-column {
+	width: 20%;
+	text-align: left;
+}
+
+.award-column {
+	width: 25%;
+	text-align: left;
+}
+
+.criteria-column {
+	width: 8%;
+	text-align: center;
+}
+
+.presentation-column {
+	width: 10%;
+	text-align: center;
+}
+
+.overall-column {
+	width: 15%;
+	text-align: center;
+}
+
+.table-body {
+	tr {
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		border-bottom: 1px solid #f1f5f9;
+		cursor: pointer;
+		
+		&:hover {
+			background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+			transform: translateY(-1px);
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+		}
+		
+		&.selected-row {
+			background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+			border-left: 4px solid #3b82f6;
+			box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+		}
+		
+		&:last-child {
+			border-bottom: none;
+		}
+	}
+}
+
+.modern-evaluation-table td {
+	padding: 12px 8px;
+	border: none;
+	vertical-align: middle;
+	transition: all 0.2s ease;
+	font-size: 13px;
+	
+	@media (min-width: 768px) {
+		padding: 14px 10px;
+		font-size: 14px;
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 16px 12px;
+		font-size: 15px;
+	}
+}
+
+.checkbox-cell {
+	text-align: center;
+	width: 40px;
+}
+
+.evaluation-checkbox {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+	accent-color: #3b82f6;
+	
+	@media (min-width: 768px) {
+		width: 18px;
+		height: 18px;
+	}
+	
+	@media (min-width: 1024px) {
+		width: 20px;
+		height: 20px;
+	}
+}
+
+.institute-cell {
+	text-align: left;
+	
+	.institute-name {
+		font-weight: 600;
+	color: #1E293B;
+		font-size: 13px;
+		line-height: 1.4;
+		
+		@media (min-width: 768px) {
+			font-size: 14px;
+		}
+		
+		@media (min-width: 1024px) {
+			font-size: 15px;
+		}
+	}
+}
+
+.award-cell {
+	text-align: left;
+	
+	.award-text {
+		font-weight: 500;
+		color: #6b7280;
+		font-size: 12px;
+		line-height: 1.4;
+		
+		@media (min-width: 768px) {
+			font-size: 13px;
+		}
+		
+		@media (min-width: 1024px) {
+			font-size: 14px;
+		}
+	}
+}
+
+.criteria-cell, .presentation-cell, .overall-cell {
+	text-align: center;
+	font-weight: 600;
+	font-size: 13px;
+	color: #1E293B;
+	min-width: 70px;
+}
+
+.overall-cell {
+	font-weight: 700;
+	font-size: 13px;
+	color: #2563EB;
+}
+
+.overall-score-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	position: relative;
+	
+	&[data-score="excellent"] {
+		.overall-score-value {
+			color: #059669;
+		}
+		
+		.progress-fill {
+			background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+		}
+	}
+	
+	&[data-score="good"] {
+		.overall-score-value {
+			color: #2563eb;
+		}
+		
+		.progress-fill {
+			background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+		}
+	}
+	
+	&[data-score="average"] {
+		.overall-score-value {
+			color: #d97706;
+		}
+		
+		.progress-fill {
+			background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+		}
+	}
+	
+	&[data-score="poor"] {
+		.overall-score-value {
+			color: #dc2626;
+		}
+		
+		.progress-fill {
+			background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+		}
+	}
+}
+
+.overall-score-value {
+	font-weight: 700;
+	font-size: 14px;
+	line-height: 1;
+	
+	@media (min-width: 768px) {
+		font-size: 15px;
+	}
+	
+	@media (min-width: 1024px) {
+		font-size: 16px;
+	}
+}
+
+.tiny-progress-bar {
+	width: 100%;
+	height: 4px;
+	background: #e5e7eb;
+	border-radius: 2px;
+	overflow: hidden;
+	position: relative;
+	
+	@media (min-width: 768px) {
+		height: 5px;
+	}
+	
+	@media (min-width: 1024px) {
+		height: 6px;
+	}
+}
+
+.progress-fill {
+	height: 100%;
+	border-radius: 2px;
+	transition: width 0.3s ease;
+	position: relative;
+	
+	&::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, transparent 50%, rgba(255, 255, 255, 0.2) 100%);
+		animation: shimmer 2s infinite;
+	}
+}
+
+@keyframes shimmer {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+// Responsive Design for All Sections
+@media (max-width: 1200px) {
+	.modern-marks-table {
+		font-size: 13px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 12px 8px;
+	}
+	
+	.modern-marks-input {
+		width: 70px !important;
+	}
+}
+
+@media (max-width: 1024px) {
+	.modern-marks-table {
+		font-size: 12px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 10px 6px;
+	}
+	
+	.modern-marks-input {
+		width: 60px !important;
+		font-size: 12px !important;
+	}
+	
+	.modern-evaluation-table {
+		font-size: 12px;
+	}
+	
+	.modern-evaluation-table th,
+	.modern-evaluation-table td {
+		padding: 10px 6px;
+	}
+	
+	.criteria-cell, .presentation-cell {
+		font-size: 11px;
+	}
+	
+	.overall-cell {
+		font-size: 12px;
+	}
+}
+
+@media (max-width: 768px) {
+	.main-content {
+		padding: 8px;
+		gap: 12px;
+	}
+	
+	.content-container {
+		gap: 12px;
+	}
+	
+	.general-details-section,
+	.marking-criteria-section,
+	.presentation-marks-section,
+	.filter-section,
+	.summary-section {
+		padding: 16px;
+		border-radius: 12px;
+	}
+	
+	.section-title {
+		font-size: 16px;
+		margin-bottom: 12px;
+	}
+	
+	.section-header h2 {
+		font-size: 18px;
+	}
+	
+	.form-row {
+		flex-direction: column;
+		gap: 12px;
+	}
+	
+	.form-field {
+		.ant-input,
+		.ant-select-selector {
+			height: 36px !important;
+			font-size: 13px !important;
+		}
+	}
+	
+	.modern-marks-table {
+		font-size: 11px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 8px 4px;
+	}
+	
+	.modern-marks-input {
+		width: 50px !important;
+		font-size: 11px !important;
+		padding: 4px 6px !important;
+	}
+	
+	.modern-evaluation-table {
+		font-size: 11px;
+	}
+	
+	.modern-evaluation-table th,
+	.modern-evaluation-table td {
+		padding: 8px 4px;
+	}
+	
+	.criteria-cell, .presentation-cell {
+		font-size: 10px;
+	}
+	
+	.overall-cell {
+		font-size: 11px;
+	}
+	
+	.modern-action-buttons {
+	flex-direction: column;
+	gap: 12px;
+		padding: 16px;
+	}
+	
+	.button-group {
+		justify-content: center;
+		gap: 8px;
+	}
+	
+	.modern-btn {
+		padding: 10px 16px;
+		font-size: 13px;
+	}
+}
+
+@media (max-width: 600px) {
+	.modern-marks-table {
+		font-size: 10px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 6px 3px;
+	}
+	
+	.modern-marks-input {
+		width: 45px !important;
+		font-size: 10px !important;
+		padding: 3px 4px !important;
+	}
+	
+	.modern-evaluation-table {
+		font-size: 10px;
+	}
+	
+	.modern-evaluation-table th,
+	.modern-evaluation-table td {
+		padding: 6px 3px;
+	}
+	
+	.criteria-cell, .presentation-cell {
+		font-size: 9px;
+	}
+	
+	.overall-cell {
+		font-size: 10px;
+	}
+	
+	.modern-action-buttons {
+		padding: 12px;
+	}
+	
+	.modern-btn {
+		padding: 8px 12px;
+		font-size: 12px;
+	}
+}
+
+@media (max-width: 480px) {
+	.modern-marks-table {
+		font-size: 9px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 4px 2px;
+	}
+	
+	.modern-marks-input {
+		width: 40px !important;
+		font-size: 9px !important;
+		padding: 2px 3px !important;
+	}
+	
+	.modern-evaluation-table {
+		font-size: 9px;
+	}
+	
+	.modern-evaluation-table th,
+	.modern-evaluation-table td {
+		padding: 4px 2px;
+	}
+	
+	.criteria-cell, .presentation-cell {
+		font-size: 8px;
+	}
+	
+	.overall-cell {
+		font-size: 9px;
+	}
+	
+	.total-value {
+		font-size: 14px;
+		padding: 4px 8px;
+	}
+	
+	.modern-warning {
+		padding: 12px;
+		gap: 8px;
+	}
+	
+	.warning-icon {
+		font-size: 16px;
+	}
+	
+	.warning-text {
+		font-size: 12px;
+		line-height: 1.3;
+	}
+	
+	.modern-action-buttons {
+		padding: 8px;
+	}
+	
+	.modern-btn {
+		padding: 6px 10px;
+		font-size: 11px;
+	}
+}
+
+// High contrast text
+.judging-system {
+	* {
+		color: #2C3E50;
+	}
+}
+
+// Button focus states
+.ant-btn:focus {
+	outline: 2px solid #ABEBC6;
+	outline-offset: 2px;
+}
+
+.ant-input,
+.ant-input-number {
+	&:focus {
+		outline: 2px solid #ABEBC6;
+		outline-offset: 2px;
+	}
+}
+
+// Dynamic Marking Criteria Section
+.marking-criteria-section {
+	background: white;
+	border-radius: 16px;
+	padding: 20px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+	
+	@media (min-width: 768px) {
+		padding: 24px;
+		border-radius: 20px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 28px;
+		border-radius: 24px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+	}
+}
+
+.criteria-content {
+	p {
+		margin: 0 0 8px 0;
+		color: #374151;
+		font-size: 14px;
+		line-height: 1.5;
+		
+		&:last-child {
+			margin-bottom: 0;
+		}
+		
+		strong {
+			color: #1f2937;
+			font-weight: 600;
+		}
+	
+	@media (min-width: 768px) {
+			font-size: 15px;
+	}
+	
+	@media (min-width: 1024px) {
+			font-size: 16px;
+		}
+	}
+}
+
+// B. Presentation Marks Section - Full Width
+.presentation-marks-section {
+	background: white;
+	border-radius: 8px;
+	padding: 12px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.section-header {
+	margin-bottom: 8px;
+	
+	h2 {
+		font-size: 14px;
+		font-weight: 600;
+		color: #1E293B;
+		margin: 0;
+		line-height: 1.3;
+	}
+}
+
+// Modern Marks Container - Full Width
+.modern-marks-container {
+	display: flex;
+		flex-direction: column;
+		gap: 8px;
+	width: 100%;
+}
+
+.modern-table-wrapper {
+	background: white;
+	border-radius: 8px;
+	overflow: hidden;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+// Modern Marks Table - Full Width
+.modern-marks-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: white;
+	font-size: 13px;
+	font-family: 'Inter', 'Poppins', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+// Table Header - Modern Styling
+.modern-marks-table thead {
+	background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+	position: relative;
+	
+	&::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
+		background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+	}
+}
+
+.modern-marks-table th {
+	padding: 12px 8px;
+	text-align: center;
+	font-weight: 700;
+	font-size: 13px;
+	color: #1E293B;
+	letter-spacing: 0.025em;
+	position: relative;
+	border: none;
+	
+	&.criteria-header {
+		text-align: left;
+		width: 50%;
+	}
+	
+	&.allocated-header,
+	&.achieved-header {
+		width: 25%;
+	}
+}
+
+// Table Body - Modern Rows
+.modern-marks-table tbody tr {
+	transition: all 0.3s ease;
+	border-bottom: 1px solid #e2e8f0;
+	
+	&:hover {
+		background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+		transform: translateY(-1px);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+	}
+	
+	&.even-row {
+		background: #fafbfc;
+	}
+	
+	&.error-row {
+		background: #fef2f2;
+		border-left: 4px solid #ef4444;
+		box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
+	}
+	
+	&:last-child {
+		border-bottom: none;
+	}
+}
+
+// Table Cells - Modern Styling
+.modern-marks-table td {
+	padding: 10px 8px;
+	border: none;
+	vertical-align: middle;
+	transition: all 0.3s ease;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+// Criteria Column
+.criteria-name {
+	text-align: left;
+	
+	.criteria-text {
+		font-weight: 600;
+		color: #1E293B;
+		line-height: 1.4;
+		display: block;
+		font-size: 13px;
+		
+		.weightage-label {
+			color: #dc2626;
+			font-weight: 700;
+		}
+	}
+}
+
+// Allocated Column
+.allocated-marks {
+	text-align: center;
+	
+	.allocated-value {
+		font-weight: 700;
+		color: #2563EB;
+		font-size: 13px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+		border-radius: 6px;
+		min-width: 35px;
+		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+	}
+}
+
+// Achieved Column
+.achieved-marks {
+	text-align: center;
+	
+	.weightage-value {
+		font-weight: 700;
+		color: #1E293B;
+		font-size: 13px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+		border-radius: 6px;
+		min-width: 50px;
+		box-shadow: 0 1px 3px rgba(245, 158, 11, 0.2);
+	}
+	
+	.aggregate-value {
+		font-weight: 700;
+		color: #1E293B;
+		font-size: 14px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+		border-radius: 6px;
+		min-width: 50px;
+		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+	}
+}
+
+// Modern Input Styling - Enhanced with Bold Centered Text
+.modern-marks-input {
+	width: 70px !important;
+	text-align: center !important;
+	border: 2px solid #e2e8f0 !important;
+	border-radius: 8px !important;
+	font-weight: 700 !important;
+	font-size: 13px !important;
+	height: 36px !important;
+	transition: all 0.3s ease !important;
+	background: white !important;
+	line-height: 1.4 !important;
+	
+	// Ensure input text is bold and centered
+	input {
+		text-align: center !important;
+		font-weight: 700 !important;
+		font-size: 13px !important;
+	}
+	
+	&:hover {
+		border-color: #3b82f6 !important;
+		box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1) !important;
+	}
+	
+	&:focus {
+		border-color: #2563eb !important;
+		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+		background: #f8fafc !important;
+		
+		input {
+			text-align: center !important;
+			font-weight: 700 !important;
+		}
+	}
+}
+
+// Ensure Ant Design input-number components have bold centered text
+.ant-input-number {
+	.modern-marks-input {
+		text-align: center !important;
+		font-weight: 700 !important;
+		
+		.ant-input-number-input {
+			text-align: center !important;
+			font-weight: 700 !important;
+			font-size: 13px !important;
+		}
+	}
+}
+
+// Global input styling for bold centered text
+.ant-input-number-input {
+	text-align: center !important;
+	font-weight: 700 !important;
+	font-size: 13px !important;
+}
+
+.placeholder-dash {
+	color: #94a3b8;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+// Total Row - Perfect Alignment
+.total-row {
+	background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%) !important;
+	color: white !important;
+	font-weight: 700;
+	position: sticky;
+	bottom: 0;
+	z-index: 10;
+	pointer-events: none;
+	box-shadow: 0 -2px 12px rgba(30, 64, 175, 0.2);
+	
+	&:hover {
+		background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%) !important;
+		transform: none !important;
+		box-shadow: 0 -2px 12px rgba(30, 64, 175, 0.2) !important;
+		border-left: none !important;
+	}
+	
+	// Total row cells should match regular table cell padding and alignment
+	td {
+		padding: 10px 8px !important;
+		vertical-align: middle !important;
+		font-size: 13px !important;
+		line-height: 1.4 !important;
+	}
+	
+	.total-label {
+		text-align: left;
+	}
+	
+	.total-allocated {
+		text-align: center;
+	}
+	
+	.total-achieved {
+		text-align: center;
+	}
+	
+	.total-text {
+		color: white !important;
+		font-weight: 700;
+		text-align: left;
+		pointer-events: none;
+		font-size: 13px;
+		display: block;
+		line-height: 1.4;
+	}
+
+	.total-value {
+		color: white !important;
+		font-weight: 700;
+		text-align: center;
+		font-size: 13px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: rgba(255, 255, 255, 0.15);
+		border-radius: 6px;
+		pointer-events: none;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		min-width: 35px;
+		line-height: 1.4;
+	}
+}
+
+// Modern Warning Message - Compact
+.modern-warning {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px;
+	background: #fef3c7;
+	border: 1px solid #f59e0b;
+	border-radius: 6px;
+	margin-top: 8px;
+}
+
+.warning-icon {
+	font-size: 14px;
+	flex-shrink: 0;
+}
+
+.warning-text {
+	color: #92400e;
+	font-weight: 500;
+	font-size: 10px;
+}
+
+// Minimal Action Buttons
+.modern-action-buttons {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 8px;
+	background: white;
+	border-radius: 6px;
+	margin-top: 8px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.button-group {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	align-items: center;
+	
+	&.left-group {
+		justify-content: flex-start;
+	}
+	
+	&.right-group {
+		justify-content: flex-end;
+	}
+}
+
+// Minimal Button Styles
+.modern-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 6px 12px;
+	border: 1px solid #e5e7eb;
+	border-radius: 4px;
+	font-weight: 500;
+	font-size: 11px;
+	font-family: 'Inter', 'Poppins', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+	transition: all 0.2s ease;
+	cursor: pointer;
+	background: white;
+	
+	.btn-icon {
+		font-size: 12px;
+	}
+	
+	.btn-text {
+		font-weight: 500;
+	}
+	
+	&:hover {
+		background: #f8fafc;
+		border-color: #d1d5db;
+	}
+	
+	&:focus {
+		outline: 1px solid #3b82f6;
+		outline-offset: 1px;
+	}
+}
+
+// Exit Button
+.btn-exit {
+	background: #ef4444;
+	color: white;
+	border-color: #ef4444;
+	
+	&:hover {
+		background: #dc2626;
+		border-color: #dc2626;
+	}
+}
+
+// Delete Button
+.btn-delete {
+	background: #f97316;
+	color: white;
+	border-color: #f97316;
+	
+	&:hover {
+		background: #ea580c;
+		border-color: #ea580c;
+	}
+}
+
+// Placeholder Buttons
+.btn-placeholder {
+	background: #e2e8f0;
+	color: #94a3b8;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border-radius: 4px;
+	opacity: 0.6;
+	cursor: default;
+	
+	&:hover {
+		background: #e2e8f0;
+		border-color: #e2e8f0;
+	}
+}
+
+// Remove Filter Button
+.btn-remove-filter {
+	background: #94a3b8;
+	color: white;
+	border-color: #94a3b8;
+	
+	&:hover {
+		background: #64748b;
+		border-color: #64748b;
+	}
+}
+
+// Load Button
+.btn-load {
+	background: #3b82f6;
+	color: white;
+	border-color: #3b82f6;
+	
+	&:hover {
+		background: #2563eb;
+		border-color: #2563eb;
+	}
+}
+
+// Reset Button
+.btn-reset {
+	background: #6b7280;
+	color: white;
+	border-color: #6b7280;
+	
+	&:hover {
+		background: #4b5563;
+		border-color: #4b5563;
+	}
+}
+
+// Submit Button
+.btn-submit {
+	background: #10b981;
+	color: white;
+	border-color: #10b981;
+	
+	&:hover:not(:disabled) {
+		background: #059669;
+		border-color: #059669;
+	}
+	
+	&:disabled {
+		background: #d1d5db;
+		color: #6b7280;
+		border-color: #d1d5db;
+		cursor: not-allowed;
+		
+		&:hover {
+			background: #d1d5db;
+			border-color: #d1d5db;
+		}
+	}
+}
+
+
+// C. Filter Section - Modern Card Design
+.filter-section {
+	background: white;
+	border-radius: 16px;
+	padding: 20px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+	
+	@media (min-width: 768px) {
+		padding: 24px;
+		border-radius: 20px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 28px;
+		border-radius: 24px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+	}
+}
+
+.filter-content {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	width: 100%;
+	
+	@media (min-width: 768px) {
+		flex-direction: row;
+		gap: 20px;
+	}
+	
+	@media (min-width: 1024px) {
+		gap: 24px;
+	}
+}
+
+.filter-row {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	flex: 1;
+	width: 100%;
+	
+	label {
+		font-weight: 600;
+		color: #374151;
+		font-size: 14px;
+		margin: 0;
+		line-height: 1.4;
+		
+		@media (min-width: 768px) {
+			font-size: 15px;
+		}
+		
+		@media (min-width: 1024px) {
+			font-size: 16px;
+		}
+	}
+}
+
+.filter-select {
+	width: 100% !important;
+	
+	.ant-select-selector {
+		height: 40px !important;
+		border-radius: 8px !important;
+		border: 1px solid #d1d5db !important;
+		font-size: 14px !important;
+		transition: all 0.2s ease !important;
+		
+		&:hover {
+			border-color: #9ca3af !important;
+		}
+		
+		&:focus,
+		&.ant-select-focused .ant-select-selector {
+			border-color: #3b82f6 !important;
+			box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+		}
+		
+		@media (min-width: 768px) {
+			height: 44px !important;
+			font-size: 15px !important;
+		}
+		
+		@media (min-width: 1024px) {
+			height: 48px !important;
+			font-size: 16px !important;
+		}
+	}
+}
+
+.award-filter-full,
+.institute-filter-full {
+	flex: 0 0 100%;
+	
+	@media (min-width: 768px) {
+		flex: 0 0 50%;
+	}
+}
+
+.form-field label {
+	font-weight: 600;
+	color: #2C3E50;
+	font-size: 12px;
+}
+
+// Award Category / Marking Criteria Placeholder Section - Compact
+.marking-criteria-placeholder {
+	background: #AED6F1;
+	border-radius: 6px;
+	padding: 12px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	
+	@media (min-width: 768px) {
+		border-radius: 8px;
+		padding: 16px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+	}
+	
+	@media (min-width: 1024px) {
+		border-radius: 10px;
+		padding: 20px;
+	}
+}
+
+.placeholder-content {
+	p {
+		margin: 6px 0;
+		color: #2C3E50;
+		font-size: 12px;
+	}
+}
+
+// Dynamic Marking Criteria Section - Compact Modern
+.marking-criteria-section {
+	background: white;
+	border-radius: 10px;
+	padding: 16px;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+	border: 1px solid #e2e8f0;
+	position: relative;
+	overflow: hidden;
+	
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, #10B981 0%, #059669 100%);
+	}
+	
+	@media (min-width: 768px) {
+		padding: 18px;
+		border-radius: 12px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 20px;
+		border-radius: 14px;
+	}
+}
+
+.criteria-content {
+	p {
+		margin: 6px 0;
+		color: #2C3E50;
+		font-size: 12px;
+	}
+}
+
+// B. Presentation Marks Section - Modern Design
+.presentation-marks-section {
+	background: white;
+	border-radius: 16px;
+	padding: 20px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+	border: 1px solid #e2e8f0;
+	position: relative;
+	overflow: hidden;
+	
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 4px;
+		background: linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%);
+	}
+	
+	@media (min-width: 768px) {
+		padding: 24px;
+		border-radius: 20px;
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 28px;
+		border-radius: 24px;
+	}
+}
+
+.section-header {
+	margin-bottom: 12px;
+	
+	@media (min-width: 768px) {
+		margin-bottom: 16px;
+	}
+	
+	@media (min-width: 1024px) {
+		margin-bottom: 20px;
+	}
+	
+	h2 {
+		font-size: 14px;
+		font-weight: 700;
+		color: #2C3E50;
+		margin: 0;
+		border-bottom: 3px solid #B03A2E;
+		padding-bottom: 4px;
+		display: inline-block;
+		
+		@media (min-width: 768px) {
+			font-size: 16px;
+			padding-bottom: 6px;
+		}
+	}
+}
+
+// Modern Marks Container
+.modern-marks-container {
+	margin-bottom: 20px;
+	overflow: hidden;
+}
+
+.modern-table-wrapper {
+	background: white;
+	border-radius: 16px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+	overflow: hidden;
+	border: 1px solid #e2e8f0;
+	position: relative;
+	
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%);
+	}
+	
+	@media (min-width: 768px) {
+		border-radius: 20px;
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+	}
+}
+
+// Modern Marks Table
+.modern-marks-table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	background: white;
+	font-family: 'Inter', 'Poppins', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+	table-layout: fixed;
+}
+
+// Table Header - Modern Design
+.modern-marks-table thead {
+	background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+	position: relative;
+	
+	&::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
+		background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%);
+	}
+}
+
+.modern-marks-table th {
+	padding: 16px 12px;
+	text-align: center;
+	font-weight: 700;
+	font-size: 14px;
+	color: #1E293B;
+	letter-spacing: 0.025em;
+	position: relative;
+	border: none;
+	
+	&.criteria-header {
+		text-align: left;
+		width: 50%;
+	}
+	
+	&.allocated-header,
+	&.achieved-header {
+		width: 25%;
+	}
+	
+	@media (min-width: 768px) {
+		padding: 18px 16px;
+		font-size: 15px;
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 20px 18px;
+		font-size: 16px;
+	}
+}
+
+// Table Body - Modern Rows
+.modern-marks-table tbody tr {
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	border-bottom: 1px solid #f1f5f9;
+	position: relative;
+	
+	&:nth-child(even) {
+		background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+	}
+	
+	&:nth-child(odd) {
+		background: white;
+	}
+	
+	&:hover {
+		background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%) !important;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+		border-left: 4px solid #3b82f6;
+	}
+	
+	&.error-row {
+		background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%) !important;
+		border-left: 4px solid #ef4444;
+		
+		.criteria-text {
+			color: #dc2626;
+		}
+	}
+	
+	&.weightage-row {
+		background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+		font-weight: 600;
+		border-left: 4px solid #f59e0b;
+		
+		&:hover {
+			background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%) !important;
+		}
+	}
+	
+	&.gap-row {
+		height: 16px;
+		background: transparent !important;
+		border: none !important;
+		
+		td {
+			padding: 0 !important;
+			border: none !important;
+		}
+	}
+	
+	&.aggregate-row {
+		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%) !important;
+		font-weight: 700;
+		border-left: 4px solid #2563eb;
+		
+		&:hover {
+			background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%) !important;
+		}
+	}
+	
+	&:last-child {
+		border-bottom: none;
+	}
+}
+
+// Table Cells - Modern Styling
+.modern-marks-table td {
+	padding: 14px 12px;
+	border: none;
+	vertical-align: middle;
+	transition: all 0.2s ease;
+	font-size: 14px;
+	
+	@media (min-width: 768px) {
+		padding: 16px 14px;
+		font-size: 15px;
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 18px 16px;
+		font-size: 16px;
+	}
+}
+
+// Criteria Column
+.criteria-name {
+	text-align: left;
+	
+	.criteria-text {
+		font-weight: 600;
+		color: #1E293B;
+		line-height: 1.4;
+		display: block;
+		font-size: 13px;
+		
+		.weightage-label {
+			color: #dc2626;
+			font-weight: 700;
+		}
+	}
+}
+
+// Allocated Column
+.allocated-marks {
+	text-align: center;
+	
+	.allocated-value {
+		font-weight: 700;
+		color: #2563EB;
+		font-size: 13px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+		border-radius: 6px;
+		min-width: 35px;
+		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+	}
+}
+
+// Achieved Column
+.achieved-marks {
+	text-align: center;
+	
+	.weightage-value {
+		font-weight: 700;
+		color: #1E293B;
+		font-size: 13px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+		border-radius: 6px;
+		min-width: 50px;
+		box-shadow: 0 1px 3px rgba(245, 158, 11, 0.2);
+	}
+	
+	.aggregate-value {
+		font-weight: 700;
+		color: #1E293B;
+		font-size: 14px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+		border-radius: 6px;
+		min-width: 50px;
+		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+	}
+}
+
+// Modern Input Styling
+.modern-marks-input {
+	width: 80px !important;
+	text-align: center;
+	border-radius: 8px !important;
+	border: 2px solid #e2e8f0 !important;
+	transition: all 0.2s ease !important;
+	
+	&:focus {
+		border-color: #3b82f6 !important;
+		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+	}
+	
+	&:hover {
+		border-color: #94a3b8 !important;
+	}
+}
+
+.placeholder-dash {
+	color: #94a3b8;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+// Total Row - Modern Highlight
+.total-row {
+	background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%) !important;
+	color: white !important;
+	font-weight: 700;
+	position: sticky;
+	bottom: 0;
+	z-index: 10;
+	
+	.total-text,
+	.total-value {
+		color: white !important;
+		font-weight: 700;
+	}
+	
+	.total-value {
+		font-size: 13px;
+		display: inline-block;
+		padding: 4px 8px;
+		background: rgba(255, 255, 255, 0.15);
+		border-radius: 6px;
+		backdrop-filter: blur(10px);
+		min-width: 35px;
+		line-height: 1.4;
+		text-align: center;
+	}
+}
+
+// Modern Warning Message
+.modern-warning {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	margin-top: 16px;
+	padding: 12px 16px;
+	background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+	border: 1px solid #fecaca;
+	border-radius: 12px;
+	box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
+	
+	.warning-icon {
+	font-size: 18px;
+		animation: pulse 2s infinite;
+}
+
+	.warning-text {
+		color: #dc2626;
+	font-weight: 600;
+	font-size: 14px;
+	}
+}
+
+@keyframes pulse {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+}
+
+// Minimal Action Buttons
+.modern-action-buttons {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 8px;
+	background: white;
+	border-radius: 6px;
+	margin-top: 8px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	border: 1px solid #e2e8f0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.button-group {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	align-items: center;
+	
+	&.left-group {
+		justify-content: flex-start;
+	}
+	
+	&.right-group {
+		justify-content: flex-end;
+	}
+}
+
+// Minimal Button Styles
+.modern-btn {
+	display: inline-flex;
+	align-items: center;
+		justify-content: center;
+	gap: 4px;
+	padding: 6px 12px;
+	border: 1px solid #e5e7eb;
+	border-radius: 4px;
+	font-weight: 500;
+	font-size: 11px;
+	font-family: 'Inter', 'Poppins', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+	transition: all 0.2s ease;
+	cursor: pointer;
+	background: white;
+	
+	.btn-icon {
+		font-size: 12px;
+	}
+	
+	.btn-text {
+		font-weight: 500;
+	}
+	
+	&:hover {
+		background: #f8fafc;
+		border-color: #d1d5db;
+	}
+	
+	&:focus {
+		outline: 1px solid #3b82f6;
+		outline-offset: 1px;
+	}
+}
+
+// Exit Button
+.btn-exit {
+	background: #ef4444;
+	color: white;
+	border-color: #ef4444;
+	
+	&:hover {
+		background: #dc2626;
+		border-color: #dc2626;
+	}
+}
+
+// Delete Button
+.btn-delete {
+	background: #f97316;
+	color: white;
+	border-color: #f97316;
+	
+	&:hover {
+		background: #ea580c;
+		border-color: #ea580c;
+	}
+}
+
+// Placeholder Buttons
+.btn-placeholder {
+	background: #e2e8f0;
+	color: #94a3b8;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border-radius: 4px;
+	opacity: 0.6;
+	cursor: default;
+	
+	&:hover {
+		background: #e2e8f0;
+		border-color: #e2e8f0;
+	}
+}
+
+// Remove Filter Button
+.btn-remove-filter {
+	background: #94a3b8;
+	color: white;
+	border-color: #94a3b8;
+	
+	&:hover {
+		background: #64748b;
+		border-color: #64748b;
+	}
+}
+
+// Load Button
+.btn-load {
+	background: #3b82f6;
+	color: white;
+	border-color: #3b82f6;
+	
+	&:hover {
+		background: #2563eb;
+		border-color: #2563eb;
+	}
+}
+
+// Reset Button
+.btn-reset {
+	background: #6b7280;
+	color: white;
+	border-color: #6b7280;
+	
+	&:hover {
+		background: #4b5563;
+		border-color: #4b5563;
+	}
+}
+
+// Submit Button
+.btn-submit {
+	background: #10b981;
+	color: white;
+	border-color: #10b981;
+	
+	&:hover:not(:disabled) {
+		background: #059669;
+		border-color: #059669;
+	}
+	
+	&:disabled {
+		background: #d1d5db;
+		color: #6b7280;
+		border-color: #d1d5db;
+		cursor: not-allowed;
+		
+		&:hover {
+			background: #d1d5db;
+			border-color: #d1d5db;
+		}
+	}
+}
+
+// C. Filter Section - Compact
+.filter-section {
+	background: white;
+	border-radius: 10px;
+	padding: 16px;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+	border: 1px solid #e2e8f0;
+	position: relative;
+	overflow: hidden;
+	
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, #F59E0B 0%, #D97706 100%);
+	}
+	
+	@media (min-width: 768px) {
+		padding: 18px;
+		border-radius: 12px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 20px;
+		border-radius: 14px;
+	}
+}
+
+.filter-content {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	
+	@media (min-width: 768px) {
+		gap: 12px;
+	}
+}
+
+.filter-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	
+	@media (min-width: 768px) {
+		gap: 12px;
+	}
+	
+	@media (max-width: 767px) {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 6px;
+	}
+}
+
+.filter-row label {
+	font-weight: 600;
+	color: #2C3E50;
+	font-size: 12px;
+	min-width: 920px;
+}
+
+.filter-select {
+	min-width: 300px;
+}
+
+// Full width filter dropdowns
+.award-filter-full {
+	flex: 1;
+	width: 100%;
+}
+
+.institute-filter-full {
+	flex: 1;
+	width: 100%;
+}
+
+// D. Summary Section (Marking Sheet) - Compact
+.summary-section {
+	background: white;
+	border-radius: 10px;
+	padding: 16px;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+	border: 1px solid #e2e8f0;
+	position: relative;
+	overflow: hidden;
+	
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%);
+	}
+	
+	@media (min-width: 768px) {
+		padding: 18px;
+		border-radius: 12px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 20px;
+		border-radius: 14px;
+	}
+}
+
+.summary-header {
+	margin-bottom: 20px;
+	
+	@media (min-width: 768px) {
+	margin-bottom: 24px;
+	}
+	
+	@media (min-width: 1024px) {
+		margin-bottom: 28px;
+	}
+	
+	h3 {
+		font-size: 16px;
+		font-weight: 700;
+		color: #1E293B;
+		margin: 0;
+		letter-spacing: -0.025em;
+		position: relative;
+		
+		&::after {
+			content: '';
+			position: absolute;
+			bottom: -6px;
+			left: 0;
+			width: 30px;
+			height: 2px;
+			background: linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%);
+			border-radius: 1px;
+		}
+		
+		@media (min-width: 768px) {
+			font-size: 18px;
+		}
+		
+		@media (min-width: 1024px) {
+			font-size: 20px;
+		}
+	}
+}
+
+// Modern Evaluation Table - Compact Responsive
+.modern-table-wrapper {
+	width: 100%;
+	max-width: 100%;
+	background: white;
+	border-radius: 10px;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+	overflow: hidden;
+	margin: 0;
+	border: 1px solid #e2e8f0;
+	position: relative;
+	
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%);
+	}
+}
+
+.table-container {
+	overflow-x: auto;
+	width: 100%;
+	max-width: 100%;
+	
+	// Custom scrollbar styling
+	&::-webkit-scrollbar {
+		height: 6px;
+	}
+	
+	&::-webkit-scrollbar-track {
+		background: #f8fafc;
+		border-radius: 3px;
+	}
+	
+	&::-webkit-scrollbar-thumb {
+		background: #cbd5e1;
+		border-radius: 3px;
+		transition: background 0.2s ease;
+		
+		&:hover {
+			background: #94a3b8;
+		}
+	}
+}
+
+// Modern Evaluation Table
+.modern-evaluation-table {
+	width: 100%;
+	min-width: 900px; // Reduced minimum width for better fit
+	border-collapse: separate;
+	border-spacing: 0;
+	background: white;
+	font-family: 'Inter', 'Poppins', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+	table-layout: auto; // Allow natural column sizing
+}
+
+// Table Header - Compact Design
+.table-header {
+	background: #E8F1FD;
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	
+	th {
+		padding: 12px 10px;
+		text-align: center;
+		font-weight: 700;
+		font-size: 13px;
+		color: #1E293B;
+		letter-spacing: 0.025em;
+		border: none;
+		white-space: nowrap;
+		position: relative;
+		
+		&:first-child {
+			text-align: center;
+		}
+		
+		@media (min-width: 768px) {
+			padding: 14px 12px;
+			font-size: 14px;
+		}
+		
+		@media (min-width: 1024px) {
+			padding: 16px 14px;
+			font-size: 15px;
+		}
+	}
+}
+
+// Table Body
+.table-body {
+	background: white;
+}
+
+// Evaluation Rows - Interactive and Accessible
+.evaluation-row {
+	background: white;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	border-bottom: 1px solid #f1f5f9;
+	cursor: pointer;
+	position: relative;
+	
+	&:hover {
+		background: #F5F9FF;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+	}
+	
+	&.selected-row {
+		background: rgba(37, 99, 235, 0.08) !important;
+		border-left: 4px solid #2563EB;
+		box-shadow: 0 8px 25px rgba(37, 99, 235, 0.15);
+		transform: translateY(-2px);
+		border-top: 1px solid rgba(37, 99, 235, 0.2);
+		border-bottom: 1px solid rgba(37, 99, 235, 0.2);
+		
+		// Enhanced text styling for selected row
+		.institute-name {
+			color: #1E40AF;
+			font-weight: 700;
+		}
+		
+		.award-text {
+			color: #1E40AF;
+			font-weight: 600;
+		}
+		
+		.criteria-cell, .presentation-cell, .overall-cell {
+			color: #1E40AF;
+			font-weight: 700;
+		}
+		
+		.overall-cell {
+			color: #1D4ED8;
+			font-weight: 800;
+		}
+	}
+	
+	&:focus {
+		outline: 2px solid #2563EB;
+		outline-offset: -2px;
+	}
+	
+	&:last-child {
+		border-bottom: none;
+		
+		td:first-child {
+			border-bottom-left-radius: 16px;
+		}
+		
+		td:last-child {
+			border-bottom-right-radius: 16px;
+		}
+	}
+}
+
+// Cell Styling - Compact Padding and Fonts
+.modern-evaluation-table td {
+	padding: 10px 8px;
+	border: none;
+	vertical-align: middle;
+	transition: all 0.2s ease;
+	font-size: 13px;
+	
+	@media (min-width: 768px) {
+		padding: 12px 10px;
+		font-size: 14px;
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 14px 12px;
+		font-size: 15px;
+	}
+}
+
+// Checkbox Column
+.checkbox-column {
+	width: 60px;
+	text-align: center;
+}
+
+.checkbox-cell {
+	width: 50px;
+	text-align: center;
+	padding: 10px 6px !important;
+	vertical-align: middle;
+}
+
+// Institute Column - Optimized for Page Fit
+.institute-column {
+	text-align: left;
+	min-width: 180px;
+	width: 20%;
+}
+
+.institute-cell {
+	text-align: left;
+	min-width: 180px;
+	
+	.institute-name {
+		font-weight: 600;
+		font-size: 13px;
+		color: #1E293B;
+		white-space: nowrap;
+		overflow: visible;
+		display: block;
+	}
+}
+
+// Award Column - Optimized for Page Fit
+.award-column {
+	text-align: left;
+	min-width: 250px;
+	width: 30%;
+}
+
+.award-cell {
+	text-align: left;
+	min-width: 250px;
+	
+	.award-text {
+		font-weight: 500;
+		font-size: 13px;
+		color: #475569;
+		line-height: 1.4;
+		white-space: nowrap;
+		overflow: visible;
+		display: block;
+	}
+}
+
+// Criteria Columns - Compact Center Aligned
+.criteria-column, .presentation-column, .overall-column {
+	text-align: center;
+	min-width: 70px;
+	width: 8%;
+}
+
+.criteria-cell, .presentation-cell, .overall-cell {
+	text-align: center;
+	font-weight: 600;
+	font-size: 13px;
+	color: #1E293B;
+	min-width: 70px;
+}
+
+.overall-cell {
+	font-weight: 700;
+	font-size: 13px;
+	color: #2563EB;
+}
+
+// Overall Score Container with Progress Bar
+.overall-score-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+
+.overall-score-value {
+	font-weight: 700;
+	font-size: 13px;
+	color: #2563EB;
+	line-height: 1;
+}
+
+// Tiny Progress Bar
+.tiny-progress-bar {
+	width: 40px;
+	height: 4px;
+	background: #E2E8F0;
+	border-radius: 2px;
+	overflow: hidden;
+	position: relative;
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.progress-fill {
+	height: 100%;
+	background: linear-gradient(90deg, #3B82F6 0%, #2563EB 50%, #1D4ED8 100%);
+	border-radius: 2px;
+	transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	position: relative;
+	
+	// Add a subtle shine effect
+	&::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 50%;
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, transparent 100%);
+		border-radius: 2px 2px 0 0;
+	}
+}
+
+// Progress bar color variations based on score
+.overall-score-container {
+	&[data-score="90-100"] .progress-fill {
+		background: linear-gradient(90deg, #10B981 0%, #059669 50%, #047857 100%);
+	}
+	
+	&[data-score="80-89"] .progress-fill {
+		background: linear-gradient(90deg, #3B82F6 0%, #2563EB 50%, #1D4ED8 100%);
+	}
+	
+	&[data-score="70-79"] .progress-fill {
+		background: linear-gradient(90deg, #F59E0B 0%, #D97706 50%, #B45309 100%);
+	}
+	
+	&[data-score="60-69"] .progress-fill {
+		background: linear-gradient(90deg, #EF4444 0%, #DC2626 50%, #B91C1C 100%);
+	}
+	
+	&[data-score="0-59"] .progress-fill {
+		background: linear-gradient(90deg, #6B7280 0%, #4B5563 50%, #374151 100%);
+	}
+}
+
+// Modern Evaluation Checkbox - Enhanced Design
+.evaluation-checkbox {
+	position: relative;
+	width: 20px;
+	height: 20px;
+	margin: 0;
+	cursor: pointer;
+	appearance: none;
+	border: 2px solid #CBD5E1;
+	border-radius: 4px;
+	background: white;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	
+	&:hover {
+		border-color: #2563EB;
+		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+		transform: scale(1.05);
+	}
+	
+	&:focus {
+		outline: 2px solid #2563EB;
+		outline-offset: 2px;
+	}
+	
+	&:checked {
+		background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+		border-color: #2563EB;
+		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+		
+		&::after {
+			content: '';
+			position: absolute;
+			top: 2px;
+			left: 6px;
+			width: 5px;
+			height: 10px;
+			border: 2px solid white;
+			border-top: none;
+			border-left: none;
+			transform: rotate(45deg);
+			animation: checkmark 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		}
+	}
+	
+	&:checked:hover {
+		transform: scale(1.05);
+		box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+	}
+}
+
+// Checkmark Animation
+@keyframes checkmark {
+	0% {
+		opacity: 0;
+		transform: rotate(45deg) scale(0.5);
+	}
+	50% {
+		opacity: 0.5;
+		transform: rotate(45deg) scale(0.8);
+	}
+	100% {
+		opacity: 1;
+		transform: rotate(45deg) scale(1);
+	}
+}
+
+// Enhanced Responsive Design for Modern Marks Table
+@media (max-width: 1200px) {
+	.modern-marks-table {
+		font-size: 13px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 12px 8px;
+	}
+	
+	.modern-marks-input {
+		width: 70px !important;
+	}
+}
+
+@media (max-width: 1024px) {
+	.modern-marks-table {
+		font-size: 12px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 10px 6px;
+	}
+	
+	.modern-marks-input {
+		width: 60px !important;
+		font-size: 12px !important;
+	}
+	
+	.allocated-value {
+		font-size: 14px;
+		padding: 3px 6px;
+	}
+}
+
+@media (max-width: 768px) {
+	.modern-marks-container {
+		margin-bottom: 16px;
+	}
+	
+	.modern-table-wrapper {
+		border-radius: 12px;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+	}
+	
+	.modern-marks-table {
+		font-size: 11px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 8px 4px;
+	}
+	
+	.modern-marks-input {
+		width: 50px !important;
+		font-size: 11px !important;
+		padding: 4px 6px !important;
+	}
+	
+	.allocated-value {
+		font-size: 12px;
+		padding: 2px 4px;
+		min-width: 30px;
+	}
+	
+	.criteria-text {
+		font-size: 11px;
+		line-height: 1.4;
+	}
+	
+	.modern-warning {
+		padding: 10px 12px;
+		margin-top: 12px;
+		
+		.warning-text {
+			font-size: 12px;
+		}
+	}
+}
+
+@media (max-width: 600px) {
+	.modern-marks-table {
+		font-size: 10px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 6px 3px;
+	}
+	
+	.modern-marks-input {
+		width: 45px !important;
+		font-size: 10px !important;
+		padding: 3px 4px !important;
+	}
+	
+	.allocated-value {
+		font-size: 10px;
+		padding: 2px 3px;
+		min-width: 25px;
+	}
+	
+	.criteria-text {
+		font-size: 10px;
+		line-height: 1.3;
+	}
+	
+	.total-value {
+		font-size: 10px;
+		padding: 4px 8px;
+	}
+	
+	.modern-action-buttons {
+		padding: 16px;
+		gap: 12px;
+	}
+	
+	.modern-btn {
+		padding: 10px 16px;
+		font-size: 12px;
+		border-radius: 8px;
+		
+		.btn-icon {
+			font-size: 14px;
+		}
+	}
+}
+
+@media (max-width: 480px) {
+	.modern-marks-table {
+		font-size: 9px;
+	}
+	
+	.modern-marks-table th,
+	.modern-marks-table td {
+		padding: 4px 2px;
+	}
+	
+	.modern-marks-input {
+		width: 40px !important;
+		font-size: 9px !important;
+		padding: 2px 3px !important;
+	}
+	
+	.allocated-value {
+		font-size: 9px;
+		padding: 1px 2px;
+		min-width: 20px;
+	}
+	
+	.criteria-text {
+		font-size: 9px;
+		line-height: 1.2;
+	}
+	
+	.total-value {
+		font-size: 9px;
+		padding: 3px 6px;
+	}
+	
+	.modern-action-buttons {
+		padding: 12px;
+		gap: 8px;
+	}
+	
+	.modern-btn {
+		padding: 8px 12px;
+		font-size: 11px;
+		border-radius: 6px;
+		
+		.btn-icon {
+			font-size: 12px;
+		}
+	}
+	
+	.button-group {
+		gap: 6px;
+	}
+}
+
+// Select dropdown active highlight
+.ant-select-focused .ant-select-selector {
+	border-color: #ABEBC6 !important;
+	box-shadow: 0 0 0 2px rgba(171, 235, 198, 0.2) !important;
+}
+
+.ant-select-item-option-selected {
+	background-color: #ABEBC6 !important;
+}
+
+// Form field focus states
+.ant-input:focus,
+.ant-input-number:focus {
+	border-color: #ABEBC6 !important;
+	box-shadow: 0 0 0 2px rgba(171, 235, 198, 0.2) !important;
+}
+
+// Enhanced Responsive Behavior
+@media (max-width: 1400px) {
+	.content-container {
+		padding: 0 8px;
+	}
+}
+
+@media (max-width: 1200px) {
+	.content-container {
+		padding: 0 12px;
+	}
+}
+
+@media (max-width: 1024px) {
+	.content-container {
+		padding: 0 16px;
+	}
+	
+	.main-content {
+		padding: 16px;
+	}
+	
+	.modern-marks-table {
+		font-size: 11px;
+	}
+	
+	.modern-marks-table th {
+		padding: 8px 4px;
+		font-size: 11px;
+	}
+	
+	.modern-marks-table td {
+		padding: 6px 4px;
+		font-size: 11px;
+	}
+	
+	.modern-marks-input {
+		width: 60px !important;
+		height: 32px !important;
+		font-size: 11px !important;
+	}
+	
+	// Total row responsive alignment
+	.total-row {
+		td {
+			padding: 6px 4px !important;
+			font-size: 11px !important;
+		}
+		
+		.total-text,
+		.total-value {
+			font-size: 11px !important;
+		}
+	}
+}
+
+@media (max-width: 768px) {
+	.general-details-section,
+	.presentation-marks-section,
+	.filter-section,
+	.summary-section,
+	.marking-criteria-placeholder,
+	.marking-criteria-section {
+		padding: 16px;
+	}
+	
+	.marks-table th,
+	.marks-table td {
+		padding: 12px 8px;
+		font-size: 13px;
+	}
+	
+	.summary-table th,
+	.summary-table td {
+		padding: 10px 6px;
+		font-size: 12px;
+	}
+	
+	.modern-marks-table {
+		font-size: 10px;
+	}
+	
+	.modern-marks-table th {
+		padding: 6px 3px;
+		font-size: 10px;
+	}
+	
+	.modern-marks-table td {
+		padding: 4px 3px;
+		font-size: 10px;
+	}
+	
+	.modern-marks-input {
+		width: 50px !important;
+		height: 28px !important;
+		font-size: 10px !important;
+	}
+	
+	.modern-btn {
+		padding: 8px 12px;
+		font-size: 11px;
+		min-height: 36px;
+	}
+	
+	// Total row responsive alignment
+	.total-row {
+		td {
+			padding: 4px 3px !important;
+			font-size: 10px !important;
+		}
+		
+		.total-text,
+		.total-value {
+			font-size: 10px !important;
+		}
+	}
+}
+
+@media (max-width: 600px) {
+	.general-details-section,
+	.presentation-marks-section,
+	.filter-section,
+	.summary-section,
+	.marking-criteria-placeholder,
+	.marking-criteria-section {
+		padding: 12px;
+	}
+	
+	.marks-table th,
+	.marks-table td {
+		padding: 10px 6px;
+		font-size: 12px;
+	}
+	
+	.modern-marks-table {
+		font-size: 9px;
+	}
+	
+	.modern-marks-table th {
+		padding: 4px 2px;
+		font-size: 9px;
+	}
+	
+	.modern-marks-table td {
+		padding: 3px 2px;
+		font-size: 9px;
+	}
+	
+	.modern-marks-input {
+		width: 45px !important;
+		height: 24px !important;
+		font-size: 9px !important;
+	}
+	
+	.modern-btn {
+		padding: 6px 10px;
+		font-size: 10px;
+		min-height: 32px;
+	}
+	
+	// Total row responsive alignment
+	.total-row {
+		td {
+			padding: 3px 2px !important;
+			font-size: 9px !important;
+		}
+		
+		.total-text,
+		.total-value {
+			font-size: 9px !important;
+		}
+	}
+}
+
+@media (max-width: 480px) {
+	.general-details-section,
+	.presentation-marks-section,
+	.filter-section,
+	.summary-section,
+	.marking-criteria-placeholder,
+	.marking-criteria-section {
+		padding: 8px;
+	}
+	
+	.marks-table th,
+	.marks-table td {
+		padding: 8px 4px;
+		font-size: 11px;
+	}
+	
+	.modern-marks-table {
+		font-size: 8px;
+	}
+	
+	.modern-marks-table th {
+		padding: 3px 1px;
+		font-size: 8px;
+	}
+	
+	.modern-marks-table td {
+		padding: 2px 1px;
+		font-size: 8px;
+	}
+	
+	.modern-marks-input {
+		width: 40px !important;
+		height: 20px !important;
+		font-size: 8px !important;
+	}
+	
+	.modern-btn {
+		padding: 4px 8px;
+		font-size: 9px;
+		min-height: 28px;
+	}
+	
+	// Total row responsive alignment
+	.total-row {
+		td {
+			padding: 2px 1px !important;
+			font-size: 8px !important;
+		}
+		
+		.total-text,
+		.total-value {
+			font-size: 8px !important;
+		}
+	}
+}
+
+// Simple Button Overrides - Remove Fancy Design
+.modern-btn {
+	padding: 8px 16px !important;
+	font-size: 14px !important;
+	font-weight: 500 !important;
+	border: 1px solid #d1d5db !important;
+	border-radius: 4px !important;
+	background: white !important;
+	transition: none !important;
+	box-shadow: none !important;
+	transform: none !important;
+	
+	&:hover {
+		background: #f9fafb !important;
+		border-color: #9ca3af !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+	
+	&:active {
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+// Light Button Colors
+.btn-exit {
+	background: #fca5a5 !important;
+	border-color: #fca5a5 !important;
+	color: #991b1b !important;
+	
+	&:hover {
+		background: #f87171 !important;
+		border-color: #f87171 !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.btn-delete {
+	background: #fed7aa !important;
+	border-color: #fed7aa !important;
+	color: #c2410c !important;
+	
+	&:hover {
+		background: #fdba74 !important;
+		border-color: #fdba74 !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.btn-remove-filter {
+	background: #d1d5db !important;
+	border-color: #d1d5db !important;
+	color: #4b5563 !important;
+	
+	&:hover {
+		background: #9ca3af !important;
+		border-color: #9ca3af !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.btn-load {
+	background: #bfdbfe !important;
+	border-color: #bfdbfe !important;
+	color: #1e40af !important;
+	
+	&:hover {
+		background: #93c5fd !important;
+		border-color: #93c5fd !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.btn-reset {
+	background: #d1d5db !important;
+	border-color: #d1d5db !important;
+	color: #374151 !important;
+	
+	&:hover {
+		background: #9ca3af !important;
+		border-color: #9ca3af !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+.btn-submit {
+	background: #86efac !important;
+	border-color: #86efac !important;
+	color: #166534 !important;
+	
+	&:hover:not(:disabled) {
+		background: #4ade80 !important;
+		border-color: #4ade80 !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+}
+
+// Edit Button Styles - Light Green
+.edit-btn {
+	background: #bbf7d0 !important;
+	border: 1px solid #86efac !important;
+	color: #166534 !important;
+	padding: 4px 8px !important;
+	font-size: 12px !important;
+	font-weight: 500 !important;
+	border-radius: 4px !important;
+	cursor: pointer !important;
+	transition: none !important;
+	
+	&:hover {
+		background: #86efac !important;
+		border-color: #4ade80 !important;
+		transform: none !important;
+		box-shadow: none !important;
+	}
+	
+	&:focus {
+		outline: 2px solid #22c55e !important;
+		outline-offset: 1px !important;
+	}
+}
+
+// Tiny Progress Bar Styles with Severity Colors
+.presentation-score-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1px;
+	width: 100%;
+}
+
+.presentation-score-value {
+	font-weight: 600;
+	font-size: 11px;
+	color: #1E293B;
+	text-align: center;
+}
+
+.presentation-progress-bar {
+	width: 100%;
+	height: 2px;
+	background: #f1f5f9;
+	border-radius: 1px;
+	overflow: hidden;
+	position: relative;
+}
+
+.presentation-progress-bar .progress-fill {
+	height: 100%;
+	border-radius: 1px;
+	transition: width 0.2s ease;
+}
+
+// Severity colors based on marks
+.presentation-score-container[data-score="90-100"] .progress-fill {
+	background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.presentation-score-container[data-score="80-89"] .progress-fill {
+	background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+}
+
+.presentation-score-container[data-score="70-79"] .progress-fill {
+	background: linear-gradient(90deg, #84cc16 0%, #65a30d 100%);
+}
+
+.presentation-score-container[data-score="60-69"] .progress-fill {
+	background: linear-gradient(90deg, #eab308 0%, #ca8a04 100%);
+}
+
+.presentation-score-container[data-score="0-59"] .progress-fill {
+	background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+}
+
+// Accessibility improvements
+.ant-select,
+.ant-input,
+.ant-input-number {
+	&:focus {
+	outline: 2px solid #ABEBC6;
+	outline-offset: 2px;
+	}
+}
+</style>
