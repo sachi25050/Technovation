@@ -19,6 +19,7 @@ import DefaultLayout from './layouts/Default.vue'
 import DashboardLayout from './layouts/Dashboard.vue'
 import DashboardRTLLayout from './layouts/DashboardRTL.vue'
 import router from './router'
+import api from './services/api';
 // import './plugins/click-away'
 
 import './scss/app.scss';
@@ -26,6 +27,7 @@ import './scss/app.scss';
 Vue.use(Antd);
 
 Vue.config.productionTip = false
+Vue.prototype.$api = api; 
 
 // Adding template layouts to the vue components.
 Vue.component("layout-default", DefaultLayout);

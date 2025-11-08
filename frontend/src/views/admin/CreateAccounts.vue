@@ -176,50 +176,49 @@
 			return {
 				form: this.$form.createForm(this),
 				loading: false,
-				recentAccounts: [
-					{
-						username: 'john.doe',
-						email: 'john.doe@example.com',
-						role: 'judger'
-					},
-					{
-						username: 'jane.smith',
-						email: 'jane.smith@example.com',
-						role: 'reporter'
-					},
-					{
-						username: 'admin.user',
-						email: 'admin@example.com',
-						role: 'admin'
-					},
-					{
-						username: 'judge.mike',
-						email: 'mike@example.com',
-						role: 'judger'
-					}
-				],
+				recentAccounts: [],
 				accountStats: {
-					total: 1250,
-					admins: 5,
-					judgers: 45,
-					reporters: 8
+					total: 0,
+					admins: 0,
+					judgers: 0,
+					reporters: 0
 				}
 			}
 		},
 		methods: {
-			handleSubmit(e) {
+			async handleSubmit(e) {
 				e.preventDefault();
-				this.form.validateFields((err, values) => {
+				this.form.validateFields(async (err, values) => {
 					if (!err) {
 						this.loading = true;
-						console.log('Received values of form: ', values);
-						
-						// Simulate API call
-						setTimeout(() => {
-							this.loading = false;
+						try {
+							// Transform form values to match API expectations
+							const userData = {
+								username: values.username,
+								email: values.email,
+								password: values.password,
+								first_name: values.firstName || '',
+								last_name: values.lastName || '',
+								role: values.role
+							};
+
+							// Call API to create user
+							await this.$api.createUser(userData);
+							
+							// Show success message
 							this.$message.success('Account created successfully!');
+							
+							// Reset form
 							this.resetForm();
-						}, 2000);
+							
+							// Refresh recent accounts and stats
+							this.loadRecentAccounts();
+							this.loadAccountStats();
+						} catch (error) {
+							this.$message.error(error.message || 'Failed to create account');
+						} finally {
+							this.loading = false;
+						}
 					}
 				});
 			},
@@ -233,7 +232,41 @@
 					reporter: 'green'
 				};
 				return colors[role] || 'default';
+			},
+
+			async loadRecentAccounts() {
+				try {
+					// Get the most recent 5 accounts
+					const response = await this.$api.getUsers({ limit: 5 });
+					this.recentAccounts = response.data;
+				} catch (error) {
+					console.error('Failed to load recent accounts:', error);
+				}
+			},
+
+			async loadAccountStats() {
+				try {
+					// Get all users to calculate stats
+					const response = await this.$api.getUsers({ limit: 1000 });
+					const users = response.data;
+					
+					// Calculate stats
+					this.accountStats = {
+						total: users.length,
+						admins: users.filter(user => user.role === 'admin').length,
+						judgers: users.filter(user => user.role === 'judger').length,
+						reporters: users.filter(user => user.role === 'reporter').length
+					};
+				} catch (error) {
+					console.error('Failed to load account stats:', error);
+				}
 			}
+		},
+
+		created() {
+			// Load initial data
+			this.loadRecentAccounts();
+			this.loadAccountStats();
 		}
 	})
 

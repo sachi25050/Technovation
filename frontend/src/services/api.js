@@ -135,6 +135,52 @@ class ApiService {
   isAuthenticated() {
     return !!localStorage.getItem('auth_token');
   }
+
+  /**
+   * Create a new user account
+   * @param {Object} userData - User data (username, email, password, first_name, last_name, role)
+   * @returns {Promise} - API response
+   */
+  async createUser(userData) {
+    return this.post('/admin/accounts', userData);
+  }
+
+  /**
+   * Update a user account
+   * @param {number} userId - User ID
+   * @param {Object} userData - User data to update
+   * @returns {Promise} - API response
+   */
+  async updateUser(userId, userData) {
+    return this.put(`/admin/accounts/${userId}`, userData);
+  }
+
+  /**
+   * Delete a user account
+   * @param {number} userId - User ID
+   * @returns {Promise} - API response
+   */
+  async deleteUser(userId) {
+    return this.delete(`/admin/accounts/${userId}`);
+  }
+
+  /**
+   * Get all user accounts with pagination
+   * @param {Object} params - Query parameters (page, limit, role)
+   * @returns {Promise} - API response
+   */
+  async getUsers(params = {}) {
+    return this.get('/admin/accounts', params);
+  }
+
+  /**
+   * Get a single user account
+   * @param {number} userId - User ID
+   * @returns {Promise} - API response
+   */
+  async getUser(userId) {
+    return this.get(`/admin/accounts/${userId}`);
+  }
 }
 
 export default new ApiService();
