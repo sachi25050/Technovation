@@ -30,19 +30,33 @@
 							/>
 						</a-form-item>
 
+						<a-form-item label="Contact Email">
+							<a-input
+								v-decorator="[
+									'email',
+									{
+										rules: [
+											{ required: true, message: 'Please input email!' },
+											{ type: 'email', message: 'Please enter a valid email!' }
+										]
+									}
+								]"
+								placeholder="Enter email (e.g., contact@institution.com)"
+							/>
+						</a-form-item>
+
 						<a-form-item label="Upload Institute Image">
 							<a-upload
 								v-decorator="[
 									'instituteImage',
 									{
-										rules: [{ required: true, message: 'Please upload institute image!' }]
+										rules: [{ required: false, message: 'Please upload institute image!' }]
 									}
 								]"
 								name="file"
 								list-type="picture-card"
 								class="image-uploader"
 								:show-upload-list="false"
-								action="https://www.mocky.io/v2/5cc8019d300000980a055e76"
 								:before-upload="beforeUpload"
 								@change="handleChange"
 							>
@@ -162,12 +176,15 @@
 </template>
 
 <script>
+	import apiService from '@/services/api';
+
 	export default ({
 		data() {
 			return {
 				form: this.$form.createForm(this),
 				loading: false,
 				imageUrl: '',
+				imageFile: null,
 				uploadLoading: false,
 				selectedAwards: [],
 				awardOptions: {
@@ -239,46 +256,60 @@
 			removeAward(index) {
 				this.selectedAwards.splice(index, 1);
 			},
-			handleSubmit(e) {
+			async handleSubmit(e) {
 				e.preventDefault();
-				this.form.validateFields((err, values) => {
+				this.form.validateFields(async (err, values) => {
 					if (!err) {
-						// Validate award categories
-						if (this.selectedAwards.length === 0) {
-							this.$message.error('Please select at least one award category!');
-							return;
-						}
-						
-						// Validate marks for each award
-						const awardsWithoutMarks = this.selectedAwards.filter(award => !award.marks && award.marks !== 0);
-						if (awardsWithoutMarks.length > 0) {
-							this.$message.error('Please enter marks for all selected award categories!');
-							return;
+						// Validate award categories (optional, but if provided, validate marks)
+						if (this.selectedAwards.length > 0) {
+							// Validate marks for each award if awards are selected
+							const awardsWithoutMarks = this.selectedAwards.filter(award => !award.marks && award.marks !== 0);
+							if (awardsWithoutMarks.length > 0) {
+								this.$message.error('Please enter marks for all selected award categories!');
+								return;
+							}
 						}
 						
 						this.loading = true;
-						const formData = {
-							...values,
-							awardCategories: this.selectedAwards.map(award => ({
-								value: award.value,
-								label: award.label,
-								marks: award.marks
-							}))
-						};
-						console.log('Received values of form: ', formData);
 						
-						// Simulate API call
-						setTimeout(() => {
+						try {
+							// Prepare institution data matching the database schema
+							const institutionData = {
+								name: values.institutionName,
+								email: values.email, // Maps to contact_email in backend
+								awardCategories: this.selectedAwards.map(award => ({
+									value: award.value,
+									label: award.label,
+									marks: award.marks
+								}))
+							};
+							
+							// Call API with image file if available
+							const response = await apiService.createInstitution(
+								institutionData,
+								this.imageFile
+							);
+							
+							if (response.success) {
+								this.$message.success(response.message || 'Institution added successfully!');
+								this.resetForm();
+							} else {
+								this.$message.error(response.message || 'Failed to add institution');
+							}
+						} catch (error) {
+							console.error('Error adding institution:', error);
+							this.$message.error(error.message || 'Failed to add institution. Please try again.');
+						} finally {
 							this.loading = false;
-							this.$message.success('Institution added successfully!');
-							this.resetForm();
-						}, 2000);
+						}
 					}
 				});
 			},
 			resetForm() {
 				this.form.resetFields();
 				this.selectedAwards = [];
+				this.imageUrl = '';
+				this.imageFile = null;
 			},
 			getTypeColor(type) {
 				const colors = {
@@ -294,21 +325,32 @@
 				const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
 				if (!isJpgOrPng) {
 					this.$message.error('You can only upload JPG/PNG file!');
+					return false;
 				}
 				const isLt2M = file.size / 1024 / 1024 < 2;
 				if (!isLt2M) {
 					this.$message.error('Image must smaller than 2MB!');
+					return false;
 				}
-				return isJpgOrPng && isLt2M;
+				// Store file immediately for later use
+				this.imageFile = file;
+				// Return false to prevent auto upload, we'll handle it in form submission
+				return false;
 			},
 			handleChange(info) {
-				if (info.file.status === 'uploading') {
-					this.uploadLoading = true;
+				// Since we prevent auto-upload, handle file selection directly
+				if (info.file.status === 'removed') {
+					this.imageFile = null;
+					this.imageUrl = '';
+					this.uploadLoading = false;
 					return;
 				}
-				if (info.file.status === 'done') {
-					// Get this url from response in real world.
-					this.getBase64(info.file.originFileObj, imageUrl => {
+				
+				// When file is selected (beforeUpload was called and returned false)
+				// The file is already stored in this.imageFile from beforeUpload
+				if (info.file.originFileObj && this.imageFile) {
+					// Get preview URL
+					this.getBase64(this.imageFile, imageUrl => {
 						this.imageUrl = imageUrl;
 						this.uploadLoading = false;
 					});

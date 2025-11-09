@@ -35,11 +35,29 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      
+      // Read response as text first (we can only read the body once)
+      const text = await response.text();
+      let data;
+      
+      // Try to parse as JSON
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // If parsing fails, it's likely HTML or plain text error
+        // Check if it's an error response
+        if (!response.ok) {
+          const error = new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+          error.status = response.status;
+          throw error;
+        }
+        // If response is ok but not JSON, that's unexpected
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 200)}`);
+      }
 
       if (!response.ok) {
         // Handle error responses
-        const error = new Error(data.message || 'An error occurred');
+        const error = new Error(data.message || data.error || 'An error occurred');
         error.status = response.status;
         error.data = data;
         throw error;
@@ -51,7 +69,12 @@ class ApiService {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         throw new Error('Network error. Please check your connection.');
       }
-      throw error;
+      // Re-throw if it's already our custom error
+      if (error.message && error.status) {
+        throw error;
+      }
+      // Otherwise wrap it
+      throw new Error(error.message || 'An error occurred');
     }
   }
 
@@ -180,6 +203,97 @@ class ApiService {
    */
   async getUser(userId) {
     return this.get(`/admin/accounts/${userId}`);
+  }
+
+  /**
+   * Create a new institution
+   * @param {Object} institutionData - Institution data (name, address, contact_number, email, etc.)
+   * @param {File} imageFile - Optional image file
+   * @returns {Promise} - API response
+   */
+  async createInstitution(institutionData, imageFile = null) {
+    // If image file is provided, use FormData
+    if (imageFile) {
+      const formData = new FormData();
+      
+      // Add all institution data fields
+      Object.keys(institutionData).forEach(key => {
+        if (key === 'awardCategories' && Array.isArray(institutionData[key])) {
+          // Send award categories as JSON string for easier parsing on backend
+          formData.append('awardCategories', JSON.stringify(institutionData[key]));
+        } else if (institutionData[key] !== null && institutionData[key] !== undefined) {
+          formData.append(key, institutionData[key]);
+        }
+      });
+      
+      // Add image file
+      formData.append('instituteImage', imageFile);
+      
+      // Make request with FormData
+      const url = `${API_BASE_URL}/admin/institutions`;
+      const token = localStorage.getItem('auth_token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      // Don't set Content-Type for FormData, browser will set it with boundary
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: formData,
+      });
+      
+      // Read response as text first (we can only read the body once)
+      const text = await response.text();
+      let data;
+      
+      // Try to parse as JSON
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // If parsing fails, it's likely HTML or plain text error
+        // Check if it's an error response
+        if (!response.ok) {
+          const error = new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+          error.status = response.status;
+          throw error;
+        }
+        // If response is ok but not JSON, that's unexpected
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 200)}`);
+      }
+      
+      if (!response.ok) {
+        const error = new Error(data.message || data.error || 'An error occurred');
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+      
+      return data;
+    } else {
+      // No image, use regular JSON POST
+      return this.post('/admin/institutions', institutionData);
+    }
+  }
+
+  /**
+   * Get all institutions
+   * @param {Object} params - Query parameters (page, limit)
+   * @returns {Promise} - API response
+   */
+  async getInstitutions(params = {}) {
+    return this.get('/admin/institutions', params);
+  }
+
+  /**
+   * Get a single institution
+   * @param {number} institutionId - Institution ID
+   * @returns {Promise} - API response
+   */
+  async getInstitution(institutionId) {
+    return this.get(`/admin/institutions/${institutionId}`);
   }
 }
 

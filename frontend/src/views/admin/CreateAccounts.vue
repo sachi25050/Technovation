@@ -238,7 +238,8 @@
 				try {
 					// Get the most recent 5 accounts
 					const response = await this.$api.getUsers({ limit: 5 });
-					this.recentAccounts = response.data;
+					// Response structure: { success: true, message: "...", data: { data: [...], pagination: {...} } }
+					this.recentAccounts = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
 				} catch (error) {
 					console.error('Failed to load recent accounts:', error);
 				}
@@ -248,7 +249,14 @@
 				try {
 					// Get all users to calculate stats
 					const response = await this.$api.getUsers({ limit: 1000 });
-					const users = response.data;
+					// Response structure: { success: true, message: "...", data: { data: [...], pagination: {...} } }
+					const users = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+					
+					// Ensure users is an array
+					if (!Array.isArray(users)) {
+						console.error('Users data is not an array:', users);
+						return;
+					}
 					
 					// Calculate stats
 					this.accountStats = {

@@ -11,7 +11,13 @@ if (!$user || $user['role'] !== 'admin') {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
-$input = json_decode(file_get_contents('php://input'), true);
+// Handle both JSON and FormData requests
+$rawInput = file_get_contents('php://input');
+$input = json_decode($rawInput, true);
+// If JSON decode failed or input is empty, try reading from $_POST (FormData)
+if (json_last_error() !== JSON_ERROR_NONE || empty($input)) {
+    $input = $_POST;
+}
 $id = isset($_GET['_params'][0]) ? (int)$_GET['_params'][0] : (isset($_GET['params'][0]) ? (int)$_GET['params'][0] : null);
 
 switch ($method) {
@@ -84,9 +90,13 @@ switch ($method) {
         $name = $input['institutionName'] ?? $input['name'] ?? '';
         $type = $input['type'] ?? 'other';
         $contactPerson = $input['contact_person'] ?? '';
-        $contactEmail = $input['contact_email'] ?? '';
+        $contactEmail = $input['contact_email'] ?? $input['email'] ?? '';
         $contactPhone = $input['contact_phone'] ?? '';
+        // Handle awardCategories - can be JSON string from FormData or array from JSON
         $awardCategories = $input['awardCategories'] ?? [];
+        if (is_string($awardCategories)) {
+            $awardCategories = json_decode($awardCategories, true) ?? [];
+        }
         
         if (empty($name)) {
             Response::validationError(['name' => 'Institution name is required']);
@@ -105,7 +115,7 @@ switch ($method) {
             }
         }
         
-        // Insert institution
+        // Insert institution - only fields that exist in database
         $stmt = $db->prepare("INSERT INTO institutions (name, image_path, image_url, type, contact_person, contact_email, contact_phone) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$name, $imagePath, $imageUrl, $type, $contactPerson, $contactEmail, $contactPhone]);
         $institutionId = $db->lastInsertId();
@@ -114,10 +124,59 @@ switch ($method) {
         if (!empty($awardCategories) && is_array($awardCategories)) {
             $stmt = $db->prepare("INSERT INTO institution_awards (institution_id, award_id, marks) VALUES (?, ?, ?)");
             foreach ($awardCategories as $award) {
-                $awardId = is_array($award) ? $award['value'] : $award;
-                $awardId = preg_replace('/[^0-9]/', '', $awardId); // Extract number from "award-14"
-                $marks = is_array($award) ? ($award['marks'] ?? 0) : 0;
-                $stmt->execute([$institutionId, $awardId, $marks]);
+                try {
+                    $awardValue = is_array($award) ? $award['value'] : $award;
+                    $marks = is_array($award) ? ($award['marks'] ?? 0) : 0;
+                    
+                    // Try to extract numeric ID from formats like "award-14", "award-6a", etc.
+                    $awardId = preg_replace('/[^0-9]/', '', $awardValue);
+                    
+                    // If we got a number, validate it exists in the database
+                    if (!empty($awardId) && is_numeric($awardId)) {
+                        $awardId = (int)$awardId;
+                        
+                        // Verify the award exists in the database
+                        $checkStmt = $db->prepare("SELECT id FROM awards WHERE id = ?");
+                        $checkStmt->execute([$awardId]);
+                        $awardExists = $checkStmt->fetch();
+                        
+                        if ($awardExists) {
+                            // Award exists, insert the relationship
+                            $stmt->execute([$institutionId, $awardId, $marks]);
+                        } else {
+                            // Award doesn't exist, try to find by award_number or category
+                            $searchStmt = $db->prepare("SELECT id FROM awards WHERE award_number LIKE ? OR category LIKE ? LIMIT 1");
+                            $searchPattern = '%' . str_replace('award-', '', $awardValue) . '%';
+                            $searchStmt->execute([$searchPattern, $searchPattern]);
+                            $foundAward = $searchStmt->fetch();
+                            
+                            if ($foundAward) {
+                                $stmt->execute([$institutionId, $foundAward['id'], $marks]);
+                            } else {
+                                // Skip this award if not found - don't fail the entire operation
+                                error_log("Warning: Award with value '{$awardValue}' not found in database. Skipping.");
+                            }
+                        }
+                    } else {
+                        // If no numeric ID found, try to find award by category or award_number
+                        $searchStmt = $db->prepare("SELECT id FROM awards WHERE award_number LIKE ? OR category LIKE ? LIMIT 1");
+                        $searchPattern = '%' . $awardValue . '%';
+                        $searchStmt->execute([$searchPattern, $searchPattern]);
+                        $foundAward = $searchStmt->fetch();
+                        
+                        if ($foundAward) {
+                            $stmt->execute([$institutionId, $foundAward['id'], $marks]);
+                        } else {
+                            // Skip this award if not found
+                            error_log("Warning: Award with value '{$awardValue}' not found in database. Skipping.");
+                        }
+                    }
+                } catch (PDOException $e) {
+                    // If foreign key constraint fails, log and continue
+                    // Don't fail the entire institution creation
+                    error_log("Warning: Failed to link award '{$awardValue}' to institution: " . $e->getMessage());
+                    // Continue with next award
+                }
             }
         }
         
