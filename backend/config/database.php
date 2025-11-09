@@ -16,7 +16,7 @@ if (file_exists(__DIR__ . '/../.env')) {
 }
 
 return [
-    'host' => $_ENV['DB_HOST'] ?? '127.0.0.1:3310', // Can be 'host' or 'host:port'
+    'host' => $_ENV['DB_HOST'] ?? '127.0.0.1:3306', // Can be 'host' or 'host:port'
     'database' => $_ENV['DB_NAME'] ?? $_ENV['DB_DATABASE'] ?? 'technovation_judging',
     'username' => $_ENV['DB_USER'] ?? $_ENV['DB_USERNAME'] ?? 'root',
     'password' => $_ENV['DB_PASS'] ?? $_ENV['DB_PASSWORD'] ?? 'root', // Set via .env or update here

@@ -260,6 +260,8 @@
 </template>
 
 <script>
+	import apiService from '@/services/api';
+
 	export default ({
 		data() {
 			return {
@@ -311,9 +313,9 @@
 			}
 		},
 		methods: {
-					handleSubmit(e) {
+					async handleSubmit(e) {
 						e.preventDefault();
-						this.form.validateFields((err, values) => {
+						this.form.validateFields(async (err, values) => {
 							if (!err) {
 								// Validate criteria
 								const validCriteria = this.criteria.filter(c => c.name && c.marks);
@@ -334,42 +336,53 @@
 
 								this.loading = true;
 								
-								// Calculate total marks from criteria
-								const calculatedTotalMarks = this.totalAllocatedMarks;
-								
-								const awardData = {
-									...values,
-									totalMarks: calculatedTotalMarks,
-									criteria: validCriteria
-								};
-								
-								console.log('Award data: ', awardData);
-								
-								// Make API call to backend
-								const token = localStorage.getItem('token');
-								fetch('http://localhost/backend/api/admin/awards', {
-									method: 'POST',
-									headers: {
-										'Content-Type': 'application/json',
-										'Authorization': `Bearer ${token}`
-									},
-									body: JSON.stringify(awardData)
-								})
-								.then(response => response.json())
-								.then(data => {
+								try {
+									// Prepare criteria data for API
+									const criteriaData = validCriteria.map(criterion => ({
+										name: criterion.name,
+										marks: parseFloat(criterion.marks),
+										description: criterion.description || null
+									}));
+									
+									// Prepare award data matching backend API expectations
+									const awardData = {
+										awardCategory: values.awardCategory,
+										awardDescription: values.awardDescription,
+										presentationWeightage: parseFloat(presentationWeightage),
+										preliminaryWeightage: parseFloat(preliminaryWeightage),
+										criteria: criteriaData
+									};
+									
+									console.log('Submitting award data:', awardData);
+									
+									// Make API call using the API service
+									const response = await apiService.createAward(awardData);
+									
 									this.loading = false;
-									if (data.success) {
-										this.$message.success(data.message || 'Award created successfully!');
+									
+									if (response.success) {
+										this.$message.success(response.message || 'Award created successfully!');
 										this.resetForm();
+										
+										// Optionally refresh recent awards list
+										this.loadRecentAwards();
 									} else {
-										this.$message.error(data.message || 'Failed to create award');
+										this.$message.error(response.message || 'Failed to create award');
 									}
-								})
-								.catch(error => {
+								} catch (error) {
 									this.loading = false;
-									console.error('Error:', error);
-									this.$message.error('Failed to create award. Please try again.');
-								});
+									console.error('Error creating award:', error);
+									
+									// Handle validation errors
+									if (error.data && error.data.errors) {
+										const errorMessages = Object.values(error.data.errors).flat();
+										errorMessages.forEach(msg => {
+											this.$message.error(msg);
+										});
+									} else {
+										this.$message.error(error.message || 'Failed to create award. Please try again.');
+									}
+								}
 							}
 						});
 					},
@@ -418,7 +431,25 @@
 				}
 				const numValue = parseFloat(value) || 0;
 				return numValue.toFixed(2) + '%';
+			},
+			async loadRecentAwards() {
+				try {
+					const response = await apiService.getAwards({ page: 1, limit: 5 });
+					if (response.success && response.data && response.data.data) {
+						this.recentAwards = response.data.data.map(award => ({
+							name: award.description || award.category,
+							category: award.category,
+							totalMarks: (award.presentation_weightage || 0) + (award.preliminary_weightage || 0)
+						}));
+					}
+				} catch (error) {
+					console.error('Error loading recent awards:', error);
+				}
 			}
+		},
+		mounted() {
+			// Load recent awards on component mount
+			this.loadRecentAwards();
 		}
 	})
 

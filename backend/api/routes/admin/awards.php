@@ -21,7 +21,7 @@ $id = isset($_GET['_params'][0]) ? (int)$_GET['_params'][0] : (isset($_GET['para
 switch ($method) {
     case 'GET':
         if ($id) {
-            // Get single award with criteria
+            // Get single award
             $stmt = $db->prepare("SELECT * FROM awards WHERE id = ?");
             $stmt->execute([$id]);
             $award = $stmt->fetch();
@@ -30,7 +30,7 @@ switch ($method) {
                 Response::notFound('Award not found');
             }
             
-            // Get criteria
+            // Get criteria for this award
             $criteriaStmt = $db->prepare("SELECT * FROM award_criteria WHERE award_id = ? ORDER BY display_order ASC");
             $criteriaStmt->execute([$id]);
             $award['criteria'] = $criteriaStmt->fetchAll();
@@ -65,60 +65,101 @@ switch ($method) {
         // Create award
         $category = $input['awardCategory'] ?? $input['category'] ?? '';
         $description = $input['awardDescription'] ?? $input['description'] ?? '';
-        $totalMarks = isset($input['totalMarks']) ? (int)$input['totalMarks'] : 100;
+        $presentationWeightage = isset($input['presentationWeightage']) ? (float)$input['presentationWeightage'] : null;
+        $preliminaryWeightage = isset($input['preliminaryWeightage']) ? (float)$input['preliminaryWeightage'] : null;
         $criteria = $input['criteria'] ?? [];
         
+        // Validation
         if (empty($category)) {
-            Response::validationError(['category' => 'Award category is required']);
+            Response::validationError(['awardCategory' => 'Award category is required']);
         }
         
+        if (empty($description)) {
+            Response::validationError(['awardDescription' => 'Award description is required']);
+        }
+        
+        if ($presentationWeightage === null || $presentationWeightage < 0) {
+            Response::validationError(['presentationWeightage' => 'Presentation weightage is required and must be a positive number']);
+        }
+        
+        if ($preliminaryWeightage === null || $preliminaryWeightage < 0) {
+            Response::validationError(['preliminaryWeightage' => 'Preliminary weightage is required and must be a positive number']);
+        }
+        
+        // Validate criteria
         if (empty($criteria) || !is_array($criteria)) {
-            Response::validationError(['criteria' => 'At least one criterion is required']);
+            Response::validationError(['criteria' => 'At least one evaluation criterion is required']);
         }
         
-        // Validate criteria marks sum
-        $totalAllocated = 0;
-        foreach ($criteria as $criterion) {
-            if (empty($criterion['name']) || !isset($criterion['marks'])) {
-                Response::validationError(['criteria' => 'All criteria must have a name and marks']);
-            }
-            $totalAllocated += (int)$criterion['marks'];
-        }
-        
-        if ($totalAllocated != $totalMarks) {
-            Response::validationError(['criteria' => 'Total allocated marks must equal award total marks']);
-        }
-        
-        // Generate award number
-        $awardNumber = 'Award-' . time();
-        
-        // Insert award
-        $stmt = $db->prepare("INSERT INTO awards (award_number, category, description, total_marks) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$awardNumber, $category, $description, $totalMarks]);
-        $awardId = $db->lastInsertId();
-        
-        // Insert criteria
-        $criteriaStmt = $db->prepare("INSERT INTO award_criteria (award_id, name, allocated_marks, description, display_order) VALUES (?, ?, ?, ?, ?)");
+        // Validate each criterion
+        $validCriteria = [];
         foreach ($criteria as $index => $criterion) {
-            $criteriaStmt->execute([
-                $awardId,
-                $criterion['name'],
-                (int)$criterion['marks'],
-                $criterion['description'] ?? '',
-                $index
-            ]);
+            if (empty($criterion['name']) || trim($criterion['name']) === '') {
+                Response::validationError(['criteria' => "Criterion #" . ($index + 1) . " name is required"]);
+            }
+            
+            $marks = isset($criterion['marks']) ? (float)$criterion['marks'] : null;
+            if ($marks === null || $marks <= 0) {
+                Response::validationError(['criteria' => "Criterion #" . ($index + 1) . " allocated marks must be a positive number"]);
+            }
+            
+            $validCriteria[] = [
+                'name' => trim($criterion['name']),
+                'allocated_marks' => $marks,
+                'description' => isset($criterion['description']) ? trim($criterion['description']) : null
+            ];
         }
         
-        // Get created award with criteria
-        $stmt = $db->prepare("SELECT * FROM awards WHERE id = ?");
-        $stmt->execute([$awardId]);
-        $award = $stmt->fetch();
+        // Validate that weightages sum to 100
+        // $totalWeightage = $presentationWeightage + $preliminaryWeightage;
+        // if (abs($totalWeightage - 100) > 0.01) { // Allow small floating point differences
+        //     Response::validationError(['weightage' => 'Presentation and Preliminary weightage must sum to 100']);
+        // }
         
-        $criteriaStmt = $db->prepare("SELECT * FROM award_criteria WHERE award_id = ? ORDER BY display_order ASC");
-        $criteriaStmt->execute([$awardId]);
-        $award['criteria'] = $criteriaStmt->fetchAll();
+        // Start transaction
+        $db->beginTransaction();
         
-        Response::success('Award created successfully', $award, 201);
+        try {
+            // Generate award number
+            $awardNumber = 'Award-' . time();
+            
+            // Insert award
+            $stmt = $db->prepare("INSERT INTO awards (award_number, category, description, presentation_weightage, preliminary_weightage) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$awardNumber, $category, $description, $presentationWeightage, $preliminaryWeightage]);
+            $awardId = $db->lastInsertId();
+            
+            // Insert criteria
+            $criteriaStmt = $db->prepare("INSERT INTO award_criteria (award_id, name, allocated_marks, description, display_order) VALUES (?, ?, ?, ?, ?)");
+            foreach ($validCriteria as $index => $criterion) {
+                $displayOrder = $index + 1;
+                $criteriaStmt->execute([
+                    $awardId,
+                    $criterion['name'],
+                    $criterion['allocated_marks'],
+                    $criterion['description'],
+                    $displayOrder
+                ]);
+            }
+            
+            // Commit transaction
+            $db->commit();
+            
+            // Get created award with criteria
+            $stmt = $db->prepare("SELECT * FROM awards WHERE id = ?");
+            $stmt->execute([$awardId]);
+            $award = $stmt->fetch();
+            
+            // Get criteria
+            $criteriaStmt = $db->prepare("SELECT * FROM award_criteria WHERE award_id = ? ORDER BY display_order ASC");
+            $criteriaStmt->execute([$awardId]);
+            $award['criteria'] = $criteriaStmt->fetchAll();
+            
+            Response::success('Award created successfully', $award, 201);
+        } catch (Exception $e) {
+            // Rollback transaction on error
+            $db->rollBack();
+            Response::error('Failed to create award: ' . $e->getMessage(), null, 500);
+        }
         break;
         
     case 'PUT':
@@ -133,10 +174,10 @@ switch ($method) {
             Response::notFound('Award not found');
         }
         
-        $category = $input['category'] ?? null;
-        $description = $input['description'] ?? null;
-        $totalMarks = isset($input['totalMarks']) ? (int)$input['totalMarks'] : null;
-        $criteria = $input['criteria'] ?? null;
+        $category = $input['awardCategory'] ?? $input['category'] ?? null;
+        $description = $input['awardDescription'] ?? $input['description'] ?? null;
+        $presentationWeightage = isset($input['presentationWeightage']) ? (float)$input['presentationWeightage'] : null;
+        $preliminaryWeightage = isset($input['preliminaryWeightage']) ? (float)$input['preliminaryWeightage'] : null;
         
         // Build update query
         $updates = [];
@@ -150,9 +191,34 @@ switch ($method) {
             $updates[] = "description = ?";
             $params[] = $description;
         }
-        if ($totalMarks !== null) {
-            $updates[] = "total_marks = ?";
-            $params[] = $totalMarks;
+        if ($presentationWeightage !== null) {
+            $updates[] = "presentation_weightage = ?";
+            $params[] = $presentationWeightage;
+        }
+        if ($preliminaryWeightage !== null) {
+            $updates[] = "preliminary_weightage = ?";
+            $params[] = $preliminaryWeightage;
+        }
+        
+        // Validate weightages if both are being updated
+        if ($presentationWeightage !== null && $preliminaryWeightage !== null) {
+            $totalWeightage = $presentationWeightage + $preliminaryWeightage;
+            if (abs($totalWeightage - 100) > 0.01) {
+                Response::validationError(['weightage' => 'Presentation and Preliminary weightage must sum to 100']);
+            }
+        } elseif ($presentationWeightage !== null || $preliminaryWeightage !== null) {
+            // If only one is being updated, check against existing value
+            $existingStmt = $db->prepare("SELECT presentation_weightage, preliminary_weightage FROM awards WHERE id = ?");
+            $existingStmt->execute([$id]);
+            $existing = $existingStmt->fetch();
+            
+            $presWeight = $presentationWeightage !== null ? $presentationWeightage : $existing['presentation_weightage'];
+            $prelimWeight = $preliminaryWeightage !== null ? $preliminaryWeightage : $existing['preliminary_weightage'];
+            
+            $totalWeightage = $presWeight + $prelimWeight;
+            if (abs($totalWeightage - 100) > 0.01) {
+                Response::validationError(['weightage' => 'Presentation and Preliminary weightage must sum to 100']);
+            }
         }
         
         if (!empty($updates)) {
@@ -162,49 +228,10 @@ switch ($method) {
             $stmt->execute($params);
         }
         
-        // Update criteria if provided
-        if ($criteria !== null && is_array($criteria)) {
-            // Delete old criteria
-            $deleteStmt = $db->prepare("DELETE FROM award_criteria WHERE award_id = ?");
-            $deleteStmt->execute([$id]);
-            
-            // Validate and insert new criteria
-            if (!empty($criteria)) {
-                $totalAllocated = 0;
-                foreach ($criteria as $criterion) {
-                    $totalAllocated += (int)($criterion['marks'] ?? 0);
-                }
-                
-                $awardStmt = $db->prepare("SELECT total_marks FROM awards WHERE id = ?");
-                $awardStmt->execute([$id]);
-                $awardData = $awardStmt->fetch();
-                
-                if ($totalAllocated != $awardData['total_marks']) {
-                    Response::validationError(['criteria' => 'Total allocated marks must equal award total marks']);
-                }
-                
-                // Insert new criteria
-                $criteriaStmt = $db->prepare("INSERT INTO award_criteria (award_id, name, allocated_marks, description, display_order) VALUES (?, ?, ?, ?, ?)");
-                foreach ($criteria as $index => $criterion) {
-                    $criteriaStmt->execute([
-                        $id,
-                        $criterion['name'],
-                        (int)$criterion['marks'],
-                        $criterion['description'] ?? '',
-                        $index
-                    ]);
-                }
-            }
-        }
-        
         // Get updated award
         $stmt = $db->prepare("SELECT * FROM awards WHERE id = ?");
         $stmt->execute([$id]);
         $award = $stmt->fetch();
-        
-        $criteriaStmt = $db->prepare("SELECT * FROM award_criteria WHERE award_id = ? ORDER BY display_order ASC");
-        $criteriaStmt->execute([$id]);
-        $award['criteria'] = $criteriaStmt->fetchAll();
         
         Response::success('Award updated successfully', $award);
         break;

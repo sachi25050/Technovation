@@ -295,6 +295,52 @@ class ApiService {
   async getInstitution(institutionId) {
     return this.get(`/admin/institutions/${institutionId}`);
   }
+
+  /**
+   * Create a new award
+   * @param {Object} awardData - Award data (awardCategory, awardDescription, presentationWeightage, preliminaryWeightage)
+   * @returns {Promise} - API response
+   */
+  async createAward(awardData) {
+    return this.post('/admin/awards', awardData);
+  }
+
+  /**
+   * Get all awards
+   * @param {Object} params - Query parameters (page, limit)
+   * @returns {Promise} - API response
+   */
+  async getAwards(params = {}) {
+    return this.get('/admin/awards', params);
+  }
+
+  /**
+   * Get a single award
+   * @param {number} awardId - Award ID
+   * @returns {Promise} - API response
+   */
+  async getAward(awardId) {
+    return this.get(`/admin/awards/${awardId}`);
+  }
+
+  /**
+   * Update an award
+   * @param {number} awardId - Award ID
+   * @param {Object} awardData - Award data to update
+   * @returns {Promise} - API response
+   */
+  async updateAward(awardId, awardData) {
+    return this.put(`/admin/awards/${awardId}`, awardData);
+  }
+
+  /**
+   * Delete an award
+   * @param {number} awardId - Award ID
+   * @returns {Promise} - API response
+   */
+  async deleteAward(awardId) {
+    return this.delete(`/admin/awards/${awardId}`);
+  }
 }
 
 export default new ApiService();

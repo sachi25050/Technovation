@@ -54,20 +54,39 @@
 									}
 								]"
 								name="file"
-								list-type="picture-card"
-								class="image-uploader"
 								:show-upload-list="false"
 								:before-upload="beforeUpload"
 								@change="handleChange"
+								accept="image/jpeg,image/jpg,image/png"
+								class="custom-image-uploader"
 							>
-								<div v-if="imageUrl">
-									<img :src="imageUrl" alt="institute" style="width: 100%" />
-								</div>
-								<div v-else>
-									<a-icon :type="loading ? 'loading' : 'plus'" />
-									<div class="ant-upload-text">Upload</div>
+								<div class="image-upload-box" :class="{ 'has-image': imageUrl, 'loading': uploadLoading }">
+									<!-- Preview Image -->
+									<div v-if="imageUrl" class="image-preview-wrapper">
+										<img :src="imageUrl" alt="Institute preview" class="preview-image" />
+										<button 
+											type="button" 
+											class="remove-image-btn" 
+											@click.stop="removeImage"
+											title="Remove / Change Image"
+										>
+											<a-icon type="close-circle" />
+											<span class="btn-text">Remove / Change</span>
+										</button>
+									</div>
+									<!-- Upload Placeholder -->
+									<div v-else class="upload-placeholder">
+										<a-icon :type="uploadLoading ? 'loading' : 'upload'" class="upload-icon" />
+										<div class="upload-text">
+											<div class="upload-title">Click to Upload</div>
+											<div class="upload-hint">JPG, PNG or JPEG (Max 2MB)</div>
+										</div>
+									</div>
 								</div>
 							</a-upload>
+							<div v-if="imageUrl" class="upload-hint-text">
+								Image uploaded successfully. Click "Remove" to change the image.
+							</div>
 						</a-form-item>
 
 						<a-form-item label="* Award Category">
@@ -229,6 +248,12 @@
 				return this.selectedAwards.map(award => award.value);
 			}
 		},
+		beforeDestroy() {
+			// Clean up object URL when component is destroyed
+			if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
+				URL.revokeObjectURL(this.imageUrl);
+			}
+		},
 		methods: {
 			handleAwardCategoryChange(selectedValues) {
 				// Find removed awards
@@ -306,6 +331,10 @@
 				});
 			},
 			resetForm() {
+				// Clean up object URL if it exists
+				if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
+					URL.revokeObjectURL(this.imageUrl);
+				}
 				this.form.resetFields();
 				this.selectedAwards = [];
 				this.imageUrl = '';
@@ -322,44 +351,72 @@
 				return colors[type] || 'default';
 			},
 			beforeUpload(file) {
-				const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
-				if (!isJpgOrPng) {
-					this.$message.error('You can only upload JPG/PNG file!');
+				// Validate file type
+				const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+				const isValidType = allowedTypes.includes(file.type.toLowerCase());
+				
+				if (!isValidType) {
+					this.$message.error('Only JPG, PNG, or JPEG formats are allowed.', 4);
 					return false;
 				}
-				const isLt2M = file.size / 1024 / 1024 < 2;
-				if (!isLt2M) {
-					this.$message.error('Image must smaller than 2MB!');
+				
+				// Validate file size (2MB = 2 * 1024 * 1024 bytes)
+				const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+				if (file.size > maxSize) {
+					this.$message.warning('File size exceeds the maximum allowed limit (2MB).', 4);
 					return false;
 				}
+				
 				// Store file immediately for later use
 				this.imageFile = file;
+				
+				// Generate preview immediately using Object URL (faster and more reliable)
+				this.uploadLoading = true;
+				
+				// Clean up previous object URL if exists
+				if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
+					URL.revokeObjectURL(this.imageUrl);
+				}
+				
+				// Create object URL for immediate preview
+				this.imageUrl = URL.createObjectURL(file);
+				this.uploadLoading = false;
+				
+				// Show success notification
+				this.$nextTick(() => {
+					this.$message.success('Image uploaded successfully.', 3);
+				});
+				
 				// Return false to prevent auto upload, we'll handle it in form submission
 				return false;
 			},
 			handleChange(info) {
-				// Since we prevent auto-upload, handle file selection directly
-				if (info.file.status === 'removed') {
+				// Handle file removal
+				if (info.file.status === 'removed' || (info.fileList && info.fileList.length === 0)) {
 					this.imageFile = null;
 					this.imageUrl = '';
 					this.uploadLoading = false;
 					return;
 				}
-				
-				// When file is selected (beforeUpload was called and returned false)
-				// The file is already stored in this.imageFile from beforeUpload
-				if (info.file.originFileObj && this.imageFile) {
-					// Get preview URL
-					this.getBase64(this.imageFile, imageUrl => {
-						this.imageUrl = imageUrl;
-						this.uploadLoading = false;
-					});
-				}
 			},
 			getBase64(img, callback) {
 				const reader = new FileReader();
 				reader.addEventListener('load', () => callback(reader.result));
+				reader.addEventListener('error', () => {
+					this.uploadLoading = false;
+					this.$message.error('Failed to load image preview');
+				});
 				reader.readAsDataURL(img);
+			},
+			removeImage() {
+				// Clean up object URL if it exists
+				if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
+					URL.revokeObjectURL(this.imageUrl);
+				}
+				this.imageFile = null;
+				this.imageUrl = '';
+				this.form.setFieldsValue({ instituteImage: null });
+				this.$message.info('Image removed. You can upload a new image.', 3);
 			}
 		}
 	})
@@ -503,6 +560,218 @@
 	@media (max-width: 768px) {
 		width: 100%;
 		min-width: 100%;
+	}
+}
+
+// Custom Image Uploader Styles
+.custom-image-uploader {
+	::v-deep .ant-upload {
+		width: 100%;
+		display: block;
+	}
+	
+	::v-deep .ant-upload-select {
+		width: 100%;
+		display: block;
+		border: none;
+		background: transparent;
+	}
+}
+
+.image-upload-box {
+	width: 100%;
+	max-width: 300px;
+	height: 250px;
+	border: 2px dashed #D9D9D9;
+	border-radius: 8px;
+	background-color: #FAFAFA;
+	position: relative;
+	overflow: hidden;
+	transition: all 0.3s ease;
+	cursor: pointer;
+	
+	&:hover {
+		border-color: #1890FF;
+		background-color: #F0F7FF;
+		box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
+	}
+	
+	&.has-image {
+		border-color: #52C41A;
+		background-color: #FFFFFF;
+		cursor: default;
+		
+		&:hover {
+			border-color: #52C41A;
+			box-shadow: 0 2px 8px rgba(82, 196, 26, 0.15);
+		}
+	}
+	
+	&.loading {
+		pointer-events: none;
+		opacity: 0.7;
+	}
+}
+
+.image-preview-wrapper {
+	width: 100%;
+	height: 100%;
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: #FFFFFF;
+	padding: 8px;
+	box-sizing: border-box;
+	
+	.preview-image {
+		max-width: 100%;
+		max-height: 100%;
+		width: auto;
+		height: auto;
+		object-fit: contain;
+		display: block;
+		border-radius: 4px;
+	}
+	
+	.remove-image-btn {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		background-color: rgba(255, 255, 255, 0.95);
+		border: 1px solid #D9D9D9;
+		border-radius: 4px;
+		padding: 6px 12px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		z-index: 10;
+		font-size: 12px;
+		color: #595959;
+		font-weight: 600;
+		
+		&:hover {
+			background-color: #FFFFFF;
+			border-color: #F5222D;
+			color: #F5222D;
+			box-shadow: 0 2px 8px rgba(245, 34, 45, 0.2);
+			transform: translateY(-1px);
+		}
+		
+		&:active {
+			transform: translateY(0);
+		}
+		
+		.anticon {
+			font-size: 14px;
+		}
+		
+		.btn-text {
+			font-size: 12px;
+			line-height: 1;
+		}
+	}
+}
+
+.upload-placeholder {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	box-sizing: border-box;
+	
+	.upload-icon {
+		font-size: 48px;
+		color: #8C8C8C;
+		margin-bottom: 16px;
+		transition: all 0.3s ease;
+	}
+	
+	.upload-text {
+		text-align: center;
+		
+		.upload-title {
+			font-size: 14px;
+			font-weight: 600;
+			color: #595959;
+			margin-bottom: 4px;
+		}
+		
+		.upload-hint {
+			font-size: 12px;
+			color: #8C8C8C;
+		}
+	}
+}
+
+.image-upload-box:hover .upload-placeholder .upload-icon {
+	color: #1890FF;
+	transform: translateY(-2px);
+}
+
+.upload-hint-text {
+	margin-top: 8px;
+	font-size: 12px;
+	color: #52C41A;
+	font-weight: 500;
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+	.image-upload-box {
+		max-width: 100%;
+		height: 200px;
+	}
+	
+	.upload-placeholder {
+		.upload-icon {
+			font-size: 40px;
+			margin-bottom: 12px;
+		}
+		
+		.upload-text {
+			.upload-title {
+				font-size: 13px;
+			}
+			
+			.upload-hint {
+				font-size: 11px;
+			}
+		}
+	}
+	
+	.remove-image-btn {
+		padding: 5px 10px;
+		font-size: 11px;
+		
+		.anticon {
+			font-size: 12px;
+		}
+		
+		.btn-text {
+			display: none; // Hide text on mobile, show only icon
+		}
+	}
+}
+
+@media (max-width: 480px) {
+	.image-upload-box {
+		height: 180px;
+	}
+	
+	.upload-placeholder {
+		padding: 16px;
+		
+		.upload-icon {
+			font-size: 36px;
+			margin-bottom: 10px;
+		}
 	}
 }
 </style>
