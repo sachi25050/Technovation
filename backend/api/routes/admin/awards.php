@@ -109,12 +109,7 @@ switch ($method) {
                 'description' => isset($criterion['description']) ? trim($criterion['description']) : null
             ];
         }
-        
-        // Validate that weightages sum to 100
-        // $totalWeightage = $presentationWeightage + $preliminaryWeightage;
-        // if (abs($totalWeightage - 100) > 0.01) { // Allow small floating point differences
-        //     Response::validationError(['weightage' => 'Presentation and Preliminary weightage must sum to 100']);
-        // }
+       
         
         // Start transaction
         $db->beginTransaction();

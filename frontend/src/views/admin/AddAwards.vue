@@ -197,14 +197,14 @@
 					</div>
 				</a-card>
 
-				<a-form-item>
-					<a-button type="primary" html-type="submit" :loading="loading" size="large">
+				<div style="margin-top: 24px;">
+					<a-button type="primary" @click="handleCreateAward" :loading="loading" size="large">
 						Create Award
 					</a-button>
 					<a-button style="margin-left: 8px;" @click="resetForm" size="large">
 						Reset
 					</a-button>
-				</a-form-item>
+				</div>
 			</a-col>
 
 			<a-col :span="24" :lg="8">
@@ -313,79 +313,105 @@
 			}
 		},
 		methods: {
-					async handleSubmit(e) {
-						e.preventDefault();
-						this.form.validateFields(async (err, values) => {
-							if (!err) {
-								// Validate criteria
-								const validCriteria = this.criteria.filter(c => c.name && c.marks);
-								if (validCriteria.length === 0) {
-									this.$message.error('Please add at least one criterion!');
-									return;
-								}
+			async handleCreateAward() {
+				// Manually validate form fields
+				this.form.validateFields(async (err, values) => {
+					if (err) {
+						// Show validation errors
+						const firstError = Object.keys(err)[0];
+						if (firstError && err[firstError] && err[firstError].errors) {
+							this.$message.error(err[firstError].errors[0].message || 'Please fill in all required fields');
+						} else {
+							this.$message.error('Please fill in all required fields correctly');
+						}
+						return;
+					}
 
-								// Validate weightage sum
-								const presentationWeightage = values.presentationWeightage || 0;
-								const preliminaryWeightage = values.preliminaryWeightage || 0;
-								const totalWeightage = presentationWeightage + preliminaryWeightage;
-								
-								if (totalWeightage !== 100) {
-									this.$message.error('Presentation and Preliminary weightage must sum to 100!');
-									return;
-								}
+					// Validate criteria
+					const validCriteria = this.criteria.filter(c => c.name && c.marks);
+					if (validCriteria.length === 0) {
+						this.$message.error('Please add at least one criterion!');
+						return;
+					}
 
-								this.loading = true;
-								
-								try {
-									// Prepare criteria data for API
-									const criteriaData = validCriteria.map(criterion => ({
-										name: criterion.name,
-										marks: parseFloat(criterion.marks),
-										description: criterion.description || null
-									}));
-									
-									// Prepare award data matching backend API expectations
-									const awardData = {
-										awardCategory: values.awardCategory,
-										awardDescription: values.awardDescription,
-										presentationWeightage: parseFloat(presentationWeightage),
-										preliminaryWeightage: parseFloat(preliminaryWeightage),
-										criteria: criteriaData
-									};
-									
-									console.log('Submitting award data:', awardData);
-									
-									// Make API call using the API service
-									const response = await apiService.createAward(awardData);
-									
-									this.loading = false;
-									
-									if (response.success) {
-										this.$message.success(response.message || 'Award created successfully!');
-										this.resetForm();
-										
-										// Optionally refresh recent awards list
-										this.loadRecentAwards();
-									} else {
-										this.$message.error(response.message || 'Failed to create award');
+					// Validate weightage sum
+					const presentationWeightage = values.presentationWeightage || 0;
+					const preliminaryWeightage = values.preliminaryWeightage || 0;
+					const totalWeightage = presentationWeightage + preliminaryWeightage;
+					
+				
+
+					this.loading = true;
+					
+					try {
+						// Prepare criteria data for API
+						const criteriaData = validCriteria.map(criterion => ({
+							name: criterion.name.trim(),
+							marks: parseFloat(criterion.marks),
+							description: criterion.description ? criterion.description.trim() : null
+						}));
+						
+						// Prepare award data matching backend API expectations
+						const awardData = {
+							awardCategory: values.awardCategory.trim(),
+							awardDescription: values.awardDescription.trim(),
+							presentationWeightage: parseFloat(presentationWeightage),
+							preliminaryWeightage: parseFloat(preliminaryWeightage),
+							criteria: criteriaData
+						};
+						
+						console.log('Submitting award data:', awardData);
+						
+						// Make API call using the API service
+						const response = await apiService.createAward(awardData);
+						
+						this.loading = false;
+						
+						if (response && response.success) {
+							this.$message.success(response.message || 'Award created successfully!');
+							this.resetForm();
+							
+							// Refresh recent awards list
+							await this.loadRecentAwards();
+						} else {
+							this.$message.error(response?.message || 'Failed to create award');
+						}
+					} catch (error) {
+						this.loading = false;
+						console.error('Error creating award:', error);
+						
+						// Handle validation errors from backend
+						if (error.data && error.data.errors) {
+							// Handle both object and array error formats
+							const errors = error.data.errors;
+							if (typeof errors === 'object' && !Array.isArray(errors)) {
+								// Object format: { field: "message" }
+								const errorMessages = Object.values(errors);
+								errorMessages.forEach(msg => {
+									if (typeof msg === 'string') {
+										this.$message.error(msg);
+									} else if (Array.isArray(msg)) {
+										msg.forEach(m => this.$message.error(m));
 									}
-								} catch (error) {
-									this.loading = false;
-									console.error('Error creating award:', error);
-									
-									// Handle validation errors
-									if (error.data && error.data.errors) {
-										const errorMessages = Object.values(error.data.errors).flat();
-										errorMessages.forEach(msg => {
-											this.$message.error(msg);
-										});
-									} else {
-										this.$message.error(error.message || 'Failed to create award. Please try again.');
-									}
-								}
+								});
+							} else if (Array.isArray(errors)) {
+								// Array format: ["message1", "message2"]
+								errors.forEach(msg => this.$message.error(msg));
 							}
-						});
-					},
+						} else if (error.data && error.data.message) {
+							// Handle error message directly
+							this.$message.error(error.data.message);
+						} else {
+							// Generic error message
+							this.$message.error(error.message || 'Failed to create award. Please try again.');
+						}
+					}
+				});
+			},
+			async handleSubmit(e) {
+				e.preventDefault();
+				await this.handleCreateAward();
+			},
 			resetForm() {
 				this.form.resetFields();
 				this.criteria = [
@@ -394,6 +420,8 @@
 						marks: null
 					}
 				];
+				this.presentationWeightage = 0;
+				this.preliminaryWeightage = 0;
 			},
 			addCriterion() {
 				this.criteria.push({
