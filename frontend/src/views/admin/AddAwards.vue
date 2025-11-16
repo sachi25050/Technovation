@@ -199,7 +199,7 @@
 
 				<div style="margin-top: 24px;">
 					<a-button type="primary" @click="handleCreateAward" :loading="loading" size="large">
-						Create Award
+						{{ isEditMode ? 'Update Award' : 'Create Award' }}
 					</a-button>
 					<a-button style="margin-left: 8px;" @click="resetForm" size="large">
 						Reset
@@ -208,23 +208,7 @@
 			</a-col>
 
 			<a-col :span="24" :lg="8">
-				<a-card title="Recent Awards" class="mb-24">
-					<a-list :data-source="recentAwards" size="small">
-							<a-list-item slot="renderItem" slot-scope="item">
-								<a-list-item-meta>
-									<a slot="title">{{ item.name }}</a>
-									<template slot="description">
-										{{ item.category }}
-									</template>
-								</a-list-item-meta>
-								<template slot="actions">
-									<a-tag :color="getCategoryColor(item.category)">{{ item.category }}</a-tag>
-								</template>
-							</a-list-item>
-					</a-list>
-				</a-card>
-
-				<a-card title="Award Statistics">
+				<a-card title="Award Statistics" class="mb-24">
 					<a-row :gutter="16">
 						<a-col :span="12">
 							<div class="stat-item">
@@ -256,6 +240,30 @@
 				</a-card>
 			</a-col>
 		</a-row>
+
+		<!-- Awards Management Table -->
+		<a-card title="Manage Awards" class="mb-24">
+			<a-table
+				:columns="awardTableColumns"
+				:data-source="allAwards"
+				:loading="tableLoading"
+				:pagination="awardPagination"
+				@change="handleAwardTableChange"
+				:scroll="{ x: 1200 }"
+				size="small"
+				rowKey="id"
+			>
+				<template slot="action" slot-scope="text, record">
+					<a href="javascript:void(0);" @click="editAward(record)" class="action-link">
+						<a-icon type="edit" /> Edit
+					</a>
+					<a-divider type="vertical" />
+					<a href="javascript:void(0);" @click="showDeleteAwardConfirm(record)" class="action-link danger">
+						<a-icon type="delete" /> Delete
+					</a>
+				</template>
+			</a-table>
+		</a-card>
 	</div>
 </template>
 
@@ -267,39 +275,75 @@
 			return {
 				form: this.$form.createForm(this),
 				loading: false,
+				tableLoading: false,
+				allAwards: [],
+				isEditMode: false,
+				editingAwardId: null,
+				currentPage: 1,
+				pageSize: 10,
+				totalAwards: 0,
+				awardPagination: {
+					current: 1,
+					pageSize: 10,
+					total: 0,
+					showTotal: (total) => `Total ${total} awards`,
+					showSizeChanger: true,
+					showQuickJumper: true,
+					pageSizeOptions: ['10', '20', '50', '100']
+				},
+				awardTableColumns: [
+					{
+						title: 'Award Number',
+						dataIndex: 'award_number',
+						key: 'award_number',
+						width: 120
+					},
+					{
+						title: 'Category',
+						dataIndex: 'category',
+						key: 'category',
+						width: 250
+					},
+					{
+						title: 'Description',
+						dataIndex: 'description',
+						key: 'description',
+						width: 300,
+						ellipsis: true
+					},
+					{
+						title: 'Presentation Weightage',
+						dataIndex: 'presentation_weightage',
+						key: 'presentation_weightage',
+						width: 150,
+						render: (text) => text !== null && text !== undefined ? `${parseFloat(text).toFixed(2)}%` : '-'
+					},
+					{
+						title: 'Preliminary Weightage',
+						dataIndex: 'preliminary_weightage',
+						key: 'preliminary_weightage',
+						width: 150,
+						render: (text) => text !== null && text !== undefined ? `${parseFloat(text).toFixed(2)}%` : '-'
+					},
+					{
+						title: 'Action',
+						key: 'action',
+						width: 120,
+						scopedSlots: { customRender: 'action' }
+					}
+				],
 				criteria: [
 					{
 						name: '',
 						marks: null
 					}
 				],
-				recentAwards: [
-					{
-						name: 'Excellence in Innovation',
-						category: 'innovation',
-						totalMarks: 100
-					},
-					{
-						name: 'Academic Achievement Award',
-						category: 'academic',
-						totalMarks: 150
-					},
-					{
-						name: 'Leadership Excellence',
-						category: 'leadership',
-						totalMarks: 120
-					},
-					{
-						name: 'Research Excellence',
-						category: 'research',
-						totalMarks: 200
-					}
-				],
+				recentAwards: [],
 				awardStats: {
-					total: 156,
-					active: 45,
-					completed: 89,
-					pending: 22
+					total: 0,
+					active: 0,
+					completed: 0,
+					pending: 0
 				},
 				presentationWeightage: 0,
 				preliminaryWeightage: 0
@@ -345,10 +389,11 @@
 					
 					try {
 						// Prepare criteria data for API
-						const criteriaData = validCriteria.map(criterion => ({
+						const criteriaData = validCriteria.map((criterion, index) => ({
 							name: criterion.name.trim(),
-							marks: parseFloat(criterion.marks),
-							description: criterion.description ? criterion.description.trim() : null
+							allocated_marks: parseFloat(criterion.marks),
+							description: criterion.description ? criterion.description.trim() : null,
+							display_order: index + 1
 						}));
 						
 						// Prepare award data matching backend API expectations
@@ -362,19 +407,27 @@
 						
 						console.log('Submitting award data:', awardData);
 						
-						// Make API call using the API service
-						const response = await apiService.createAward(awardData);
+						let response;
+						if (this.isEditMode && this.editingAwardId) {
+							// Update existing award
+							response = await apiService.updateAward(this.editingAwardId, awardData);
+							this.$message.success(response.message || 'Award updated successfully!');
+						} else {
+							// Create new award
+							response = await apiService.createAward(awardData);
+							this.$message.success(response.message || 'Award created successfully!');
+						}
 						
 						this.loading = false;
 						
 						if (response && response.success) {
-							this.$message.success(response.message || 'Award created successfully!');
 							this.resetForm();
-							
-							// Refresh recent awards list
+							// Refresh awards list and stats
+							await this.loadAllAwards();
+							await this.loadAwardStats();
 							await this.loadRecentAwards();
 						} else {
-							this.$message.error(response?.message || 'Failed to create award');
+							this.$message.error(response?.message || 'Failed to save award');
 						}
 					} catch (error) {
 						this.loading = false;
@@ -422,6 +475,8 @@
 				];
 				this.presentationWeightage = 0;
 				this.preliminaryWeightage = 0;
+				this.isEditMode = false;
+				this.editingAwardId = null;
 			},
 			addCriterion() {
 				this.criteria.push({
@@ -473,10 +528,134 @@
 				} catch (error) {
 					console.error('Error loading recent awards:', error);
 				}
+			},
+			async loadAllAwards() {
+				this.tableLoading = true;
+				try {
+					const response = await apiService.getAwards({ 
+						limit: this.pageSize,
+						page: this.currentPage
+					});
+					const awards = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+					this.allAwards = Array.isArray(awards) ? awards : [];
+					
+					// Update pagination total
+					if (response.data && response.data.pagination) {
+						this.totalAwards = response.data.pagination.total || this.allAwards.length;
+					} else {
+						this.totalAwards = this.allAwards.length;
+					}
+					
+					// Update pagination object
+					this.awardPagination = {
+						...this.awardPagination,
+						current: this.currentPage,
+						pageSize: this.pageSize,
+						total: this.totalAwards
+					};
+				} catch (error) {
+					console.error('Failed to load awards:', error);
+					this.$message.error('Failed to load awards');
+				} finally {
+					this.tableLoading = false;
+				}
+			},
+			handleAwardTableChange(pagination, filters, sorter) {
+				this.currentPage = pagination.current;
+				this.pageSize = pagination.pageSize;
+				this.loadAllAwards();
+			},
+			async loadAwardStats() {
+				try {
+					const response = await apiService.getAwards({ limit: 10000 });
+					const awards = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+					
+					if (!Array.isArray(awards)) {
+						console.error('Awards data is not an array:', awards);
+						return;
+					}
+					
+					this.awardStats = {
+						total: awards.length,
+						active: awards.length, // You can add status field later
+						completed: 0,
+						pending: 0
+					};
+				} catch (error) {
+					console.error('Failed to load award stats:', error);
+				}
+			},
+			async editAward(award) {
+				this.isEditMode = true;
+				this.editingAwardId = award.id;
+				
+				// Load full award details with criteria
+				try {
+					const response = await apiService.getAward(award.id);
+					const fullAward = response.data;
+					
+					// Populate form with award data
+					this.$nextTick(() => {
+						this.form.setFieldsValue({
+							awardCategory: fullAward.category || fullAward.award_number || '',
+							awardDescription: fullAward.description || '',
+							presentationWeightage: fullAward.presentation_weightage || 0,
+							preliminaryWeightage: fullAward.preliminary_weightage || 0
+						});
+						
+						// Load criteria
+						if (fullAward.criteria && Array.isArray(fullAward.criteria)) {
+							this.criteria = fullAward.criteria.map(c => ({
+								name: c.name || '',
+								marks: c.allocated_marks || c.marks || null,
+								description: c.description || null
+							}));
+						} else {
+							this.criteria = [{ name: '', marks: null }];
+						}
+						
+						// Update weightages
+						this.presentationWeightage = fullAward.presentation_weightage || 0;
+						this.preliminaryWeightage = fullAward.preliminary_weightage || 0;
+					});
+					
+					// Scroll to form
+					window.scrollTo({ top: 0, behavior: 'smooth' });
+				} catch (error) {
+					console.error('Error loading award details:', error);
+					this.$message.error('Failed to load award details');
+				}
+			},
+			showDeleteAwardConfirm(award) {
+				const self = this;
+				this.$confirm({
+					title: 'Confirm Delete',
+					content: `Are you sure you want to delete "${award.category || award.award_number}"? This action cannot be undone.`,
+					okText: 'Yes, Delete',
+					okType: 'danger',
+					cancelText: 'Cancel',
+					onOk() {
+						return self.deleteAward(award.id);
+					}
+				});
+			},
+			async deleteAward(awardId) {
+				try {
+					await apiService.deleteAward(awardId);
+					this.$message.success('Award deleted successfully!');
+					// Refresh the awards list and stats
+					this.loadAllAwards();
+					this.loadAwardStats();
+					this.loadRecentAwards();
+				} catch (error) {
+					this.$message.error(error.message || 'Failed to delete award');
+				}
 			}
 		},
 		mounted() {
-			// Load recent awards on component mount
+			// Load initial data
+			this.loadAllAwards();
+			this.loadAwardStats();
 			this.loadRecentAwards();
 		}
 	})
@@ -553,6 +732,23 @@
 		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
+	}
+}
+
+.action-link {
+	color: #1890ff;
+	transition: color 0.3s;
+	
+	&:hover {
+		color: #40a9ff;
+	}
+	
+	&.danger {
+		color: #ff4d4f;
+		
+		&:hover {
+			color: #ff7875;
+		}
 	}
 }
 
