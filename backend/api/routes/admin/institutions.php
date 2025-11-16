@@ -313,17 +313,25 @@ switch ($method) {
         }
         
         // Handle image upload if new image provided
-        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        // Check for both 'image' and 'instituteImage' field names for compatibility
+        $imageFile = null;
+        if (isset($_FILES['instituteImage']) && $_FILES['instituteImage']['error'] === UPLOAD_ERR_OK) {
+            $imageFile = $_FILES['instituteImage'];
+        } elseif (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $imageFile = $_FILES['image'];
+        }
+        
+        if ($imageFile) {
             // Delete old image
             $oldStmt = $db->prepare("SELECT image_path FROM institutions WHERE id = ?");
             $oldStmt->execute([$id]);
             $oldInstitution = $oldStmt->fetch();
-            if ($oldInstitution['image_path']) {
+            if ($oldInstitution && $oldInstitution['image_path']) {
                 FileUpload::deleteFile(basename($oldInstitution['image_path']), 'institutions');
             }
             
             try {
-                $imageInfo = FileUpload::uploadImage($_FILES['image'], 'institutions');
+                $imageInfo = FileUpload::uploadImage($imageFile, 'institutions');
                 $imagePath = $imageInfo['path'];
                 $imageUrl = $imageInfo['url'];
                 

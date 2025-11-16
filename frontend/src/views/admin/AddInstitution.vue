@@ -63,7 +63,13 @@
 								<div class="image-upload-box" :class="{ 'has-image': imageUrl, 'loading': uploadLoading }">
 									<!-- Preview Image -->
 									<div v-if="imageUrl" class="image-preview-wrapper">
-										<img :src="imageUrl" alt="Institute preview" class="preview-image" />
+										<img 
+											:src="imageUrl" 
+											alt="Institute preview" 
+											class="preview-image"
+											@error="handleImageError"
+											@load="handleImageLoad"
+										/>
 										<button 
 											type="button" 
 											class="remove-image-btn" 
@@ -363,9 +369,11 @@
 							let response;
 							if (this.isEditMode && this.editingInstitutionId) {
 								// Update existing institution
+								// Pass imageFile if a new image was uploaded, otherwise it will keep the existing one
 								response = await this.$api.updateInstitution(
 									this.editingInstitutionId,
-									institutionData
+									institutionData,
+									this.imageFile // Pass image file if user uploaded a new one
 								);
 								this.$message.success(response.message || 'Institution updated successfully!');
 							} else {
@@ -402,6 +410,8 @@
 				this.selectedAwards = [];
 				this.imageUrl = '';
 				this.imageFile = null;
+				this.isEditMode = false;
+				this.editingInstitutionId = null;
 			},
 			getTypeColor(type) {
 				const colors = {
@@ -482,6 +492,14 @@
 			this.isEditMode = true;
 			this.editingInstitutionId = institution.id;
 			
+			// Clean up any existing blob URL before loading new data
+			if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
+				URL.revokeObjectURL(this.imageUrl);
+			}
+			
+			// Reset image file when editing
+			this.imageFile = null;
+			
 			// Populate form with institution data
 			this.$nextTick(() => {
 				this.form.setFieldsValue({
@@ -519,9 +537,48 @@
 					this.selectedAwards = [];
 				}
 				
-				// Load existing image if any
+				// Load existing image if any - ensure it's a valid URL
 				if (institution.image_url) {
-					this.imageUrl = institution.image_url;
+					// Use the full URL from the API response
+					let imageUrl = institution.image_url;
+					
+					// Convert to API endpoint URL if it's a backend/uploads path
+					// Extract the path from URLs like http://localhost:8000/backend/uploads/institutions/filename.jpg
+					if (imageUrl.includes('/backend/uploads/')) {
+						// Extract the relative path (e.g., institutions/filename.jpg)
+						const pathMatch = imageUrl.match(/\/backend\/uploads\/(.+)$/);
+						if (pathMatch && pathMatch[1]) {
+							// Use the API uploads endpoint
+							const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+							imageUrl = `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+						}
+					}
+					
+					// Fix URL if it's missing the port (backend runs on port 8000)
+					if (imageUrl && imageUrl.includes('localhost/') && !imageUrl.includes('localhost:')) {
+						imageUrl = imageUrl.replace('http://localhost/', 'http://localhost:8000/');
+						imageUrl = imageUrl.replace('https://localhost/', 'https://localhost:8000/');
+					}
+					
+					// Ensure the URL is absolute
+					if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('blob:')) {
+						// If it's a relative URL, make it absolute
+						if (imageUrl.startsWith('//')) {
+							imageUrl = window.location.protocol + imageUrl;
+						} else if (imageUrl.startsWith('/')) {
+							// Absolute path from root - use localhost:8000 as backend base
+							imageUrl = 'http://localhost:8000' + imageUrl;
+						} else {
+							// Relative path
+							imageUrl = 'http://localhost:8000/' + imageUrl;
+						}
+					}
+					
+					this.imageUrl = imageUrl;
+					console.log('Loading image for edit:', this.imageUrl);
+				} else {
+					// Clear image if no URL
+					this.imageUrl = '';
 				}
 			});
 
@@ -617,13 +674,81 @@
 				if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
 					URL.revokeObjectURL(this.imageUrl);
 				}
-			this.imageFile = null;
-			this.imageUrl = '';
-			this.form.setFieldsValue({ instituteImage: null });
-			this.$message.info('Image removed. You can upload a new image.', 3);
-		}
-		
-	},
+				this.imageFile = null;
+				this.imageUrl = '';
+				this.form.setFieldsValue({ instituteImage: null });
+				this.$message.info('Image removed. You can upload a new image.', 3);
+			},
+			handleImageError(event) {
+				// Handle image loading errors
+				const failedUrl = this.imageUrl;
+				console.error('Image failed to load:', failedUrl);
+				
+				// Prevent infinite loop by checking if we've already tried to fix this URL
+				if (event.target.dataset.retryAttempt) {
+					// Already tried once, show error and stop
+					this.$message.warning('Image could not be loaded. The file may have been moved or deleted.', 4);
+					// Clear the broken image
+					if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
+						URL.revokeObjectURL(this.imageUrl);
+					}
+					this.imageUrl = '';
+					this.imageFile = null;
+					return;
+				}
+				
+				// If it's a remote URL (not a blob), try to fix it once
+				if (failedUrl && !failedUrl.startsWith('blob:')) {
+					let fixedUrl = failedUrl;
+					
+					// Convert to API endpoint URL if it's a backend/uploads path
+					if (fixedUrl.includes('/backend/uploads/')) {
+						const pathMatch = fixedUrl.match(/\/backend\/uploads\/(.+)$/);
+						if (pathMatch && pathMatch[1]) {
+							const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+							fixedUrl = `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+						}
+					}
+					
+					// Fix port issue - backend runs on port 8000
+					if (fixedUrl.includes('localhost/') && !fixedUrl.includes('localhost:')) {
+						fixedUrl = fixedUrl.replace('http://localhost/', 'http://localhost:8000/');
+						fixedUrl = fixedUrl.replace('https://localhost/', 'https://localhost:8000/');
+					}
+					
+					// Check if URL needs protocol or is relative
+					if (fixedUrl.startsWith('//')) {
+						// Protocol-relative URL, try adding http:
+						fixedUrl = window.location.protocol + fixedUrl;
+					} else if (!fixedUrl.startsWith('http://') && !fixedUrl.startsWith('https://')) {
+						// Relative URL, try to make it absolute with correct port
+						if (fixedUrl.startsWith('/')) {
+							// Absolute path from root - use localhost:8000
+							fixedUrl = 'http://localhost:8000' + fixedUrl;
+						} else {
+							// Relative path
+							fixedUrl = 'http://localhost:8000/' + fixedUrl;
+						}
+					}
+					
+					// Only retry if URL was actually changed
+					if (fixedUrl !== failedUrl) {
+						event.target.dataset.retryAttempt = 'true';
+						this.imageUrl = fixedUrl;
+						event.target.src = fixedUrl;
+						return;
+					}
+				}
+				
+				// If we get here, the image truly can't be loaded
+				event.target.dataset.retryAttempt = 'true';
+				this.$message.warning('Image could not be loaded. Please upload a new image.', 4);
+			},
+			handleImageLoad(event) {
+				// Image loaded successfully
+				console.log('Image loaded successfully:', this.imageUrl);
+			}
+		},
 	
 	created() {
 		// Load initial data

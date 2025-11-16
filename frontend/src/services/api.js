@@ -300,17 +300,60 @@ class ApiService {
    * Update an institution
    * @param {number} institutionId - Institution ID
    * @param {Object} institutionData - Institution data to update
+   * @param {File} imageFile - Optional image file to update
    * @returns {Promise} - API response
    */
-  async updateInstitution(institutionId, institutionData) {
-    // For updates, we need to send awardCategories as JSON string if present
-    const dataToSend = { ...institutionData };
-    
-    if (dataToSend.awardCategories && Array.isArray(dataToSend.awardCategories)) {
-      dataToSend.awardCategories = JSON.stringify(dataToSend.awardCategories);
+  async updateInstitution(institutionId, institutionData, imageFile = null) {
+    // If image file is provided, use FormData (similar to create)
+    if (imageFile) {
+      const formData = new FormData();
+      
+      // Add all institution data fields
+      Object.keys(institutionData).forEach(key => {
+        if (key === 'awardCategories' && Array.isArray(institutionData[key])) {
+          // Send award categories as JSON string for easier parsing on backend
+          formData.append('awardCategories', JSON.stringify(institutionData[key]));
+        } else if (institutionData[key] !== null && institutionData[key] !== undefined) {
+          formData.append(key, institutionData[key]);
+        }
+      });
+      
+      // Add image file
+      formData.append('instituteImage', imageFile);
+      
+      // Make request with FormData
+      const url = `${API_BASE_URL}/admin/institutions/${institutionId}`;
+      const token = localStorage.getItem('auth_token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      // Don't set Content-Type for FormData, browser will set it with boundary
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: headers,
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update institution');
+      }
+      
+      return data;
+    } else {
+      // No image file, send as JSON
+      const dataToSend = { ...institutionData };
+      
+      if (dataToSend.awardCategories && Array.isArray(dataToSend.awardCategories)) {
+        dataToSend.awardCategories = JSON.stringify(dataToSend.awardCategories);
+      }
+      
+      return this.put(`/admin/institutions/${institutionId}`, dataToSend);
     }
-    
-    return this.put(`/admin/institutions/${institutionId}`, dataToSend);
   }
 
   /**

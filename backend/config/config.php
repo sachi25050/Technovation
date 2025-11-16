@@ -25,7 +25,7 @@ return [
     
     // File Upload Configuration
     'upload_path' => __DIR__ . '/../uploads/',
-    'upload_url' => $_ENV['APP_URL'] ?? 'http://localhost' . '/backend/uploads/',
+    'upload_url' => ($_ENV['APP_URL'] ?? 'http://localhost:8000') . '/backend/uploads/',
     'max_file_size' => 2048 * 1024, // 2MB
     'allowed_image_types' => ['image/jpeg', 'image/png', 'image/jpg'],
     
