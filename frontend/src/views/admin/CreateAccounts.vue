@@ -80,7 +80,7 @@
 												]
 											}
 										]"
-										placeholder="Enter password"
+										placeholder="Enter password (leave empty to keep current password)"
 									/>
 								</a-form-item>
 							</a-col>
@@ -108,7 +108,7 @@
 
 						<a-form-item>
 							<a-button type="primary" html-type="submit" :loading="loading" size="large">
-								Create Account
+								{{ isEditMode ? 'Update Account' : 'Create Account' }}
 							</a-button>
 							<a-button style="margin-left: 8px;" @click="resetForm" size="large">
 								Reset
@@ -119,23 +119,7 @@
 			</a-col>
 
 			<a-col :span="24" :lg="8">
-				<a-card title="Recent Accounts" class="mb-24">
-					<a-list :data-source="recentAccounts" size="small">
-						<a-list-item slot="renderItem" slot-scope="item">
-							<a-list-item-meta>
-								<a slot="title">{{ item.username }}</a>
-								<template slot="description">
-									{{ item.email }} • {{ item.role }}
-								</template>
-							</a-list-item-meta>
-							<template slot="actions">
-								<a-tag :color="getRoleColor(item.role)">{{ item.role }}</a-tag>
-							</template>
-						</a-list-item>
-					</a-list>
-				</a-card>
-
-				<a-card title="Account Statistics">
+				<a-card title="Account Statistics" class="mb-24">
 					<a-row :gutter="16">
 						<a-col :span="12">
 							<div class="stat-item">
@@ -167,6 +151,33 @@
 				</a-card>
 			</a-col>
 		</a-row>
+
+		<!-- User Management Table -->
+		<a-card title="Manage Users" class="mb-24">
+			<a-table
+				:columns="tableColumns"
+				:data-source="allAccounts"
+				:loading="tableLoading"
+				:pagination="pagination"
+				@change="handleTableChange"
+				:scroll="{ x: 1000 }"
+				size="small"
+				rowKey="id"
+			>
+				<template slot="role" slot-scope="text">
+					<a-tag :color="getRoleColor(text)">{{ text }}</a-tag>
+				</template>
+				<template slot="action" slot-scope="text, record">
+					<a href="javascript:void(0);" @click="editUser(record)" class="action-link">
+						<a-icon type="edit" /> Edit
+					</a>
+					<a-divider type="vertical" />
+					<a href="javascript:void(0);" @click="showDeleteConfirm(record)" class="action-link danger">
+						<a-icon type="delete" /> Delete
+					</a>
+				</template>
+			</a-table>
+		</a-card>
 	</div>
 </template>
 
@@ -176,13 +187,62 @@
 			return {
 				form: this.$form.createForm(this),
 				loading: false,
-				recentAccounts: [],
+				tableLoading: false,
+				allAccounts: [],
+				isEditMode: false,
+				editingUserId: null,
+				currentPage: 1,
+				pageSize: 10,
+				totalUsers: 0,
+				pagination: {
+					current: 1,
+					pageSize: 10,
+					total: 0,
+					showTotal: (total) => `Total ${total} users`,
+					showSizeChanger: true,
+					showQuickJumper: true,
+					pageSizeOptions: ['10', '20', '50', '100']
+				},
 				accountStats: {
 					total: 0,
 					admins: 0,
 					judgers: 0,
 					reporters: 0
-				}
+				},
+				tableColumns: [
+					{
+						title: 'Username',
+						dataIndex: 'username',
+						key: 'username',
+						width: 120
+					},
+					{
+						title: 'Email',
+						dataIndex: 'email',
+						key: 'email',
+						width: 180
+					},
+					{
+						title: 'Full Name',
+						dataIndex: 'fullName',
+						key: 'fullName',
+						width: 150,
+						render: (text, record) => `${record.first_name || ''} ${record.last_name || ''}`.trim()
+					},
+					{
+						title: 'Role',
+						dataIndex: 'role',
+						key: 'role',
+						width: 100,
+						scopedSlots: { customRender: 'role' }
+					},
+					{
+						title: 'Action',
+						key: 'action',
+						width: 120,
+						scopedSlots: { customRender: 'action' }
+					}
+				]
 			}
 		},
 		methods: {
@@ -196,35 +256,53 @@
 							const userData = {
 								username: values.username,
 								email: values.email,
-								password: values.password,
 								first_name: values.firstName || '',
 								last_name: values.lastName || '',
 								role: values.role
 							};
 
-							// Call API to create user
-							await this.$api.createUser(userData);
+							// Only include password if it's provided
+							if (values.password) {
+								userData.password = values.password;
+							}
+
+							if (this.isEditMode && this.editingUserId) {
+								// Update existing user
+								await this.$api.updateUser(this.editingUserId, userData);
+								this.$message.success('Account updated successfully!');
+							} else {
+								// Create new user
+								if (!values.password) {
+									this.$message.error('Password is required for new accounts');
+									this.loading = false;
+									return;
+								}
+								userData.password = values.password;
+								await this.$api.createUser(userData);
+								this.$message.success('Account created successfully!');
+							}
 							
-							// Show success message
-							this.$message.success('Account created successfully!');
-							
-							// Reset form
+							// Reset form and mode
 							this.resetForm();
 							
-							// Refresh recent accounts and stats
-							this.loadRecentAccounts();
+							// Refresh users list and stats
+							this.loadAllAccounts();
 							this.loadAccountStats();
 						} catch (error) {
-							this.$message.error(error.message || 'Failed to create account');
+							this.$message.error(error.message || 'Failed to save account');
 						} finally {
 							this.loading = false;
 						}
 					}
 				});
 			},
+
 			resetForm() {
 				this.form.resetFields();
+				this.isEditMode = false;
+				this.editingUserId = null;
 			},
+
 			getRoleColor(role) {
 				const colors = {
 					admin: 'red',
@@ -234,46 +312,119 @@
 				return colors[role] || 'default';
 			},
 
-			async loadRecentAccounts() {
-				try {
-					// Get the most recent 5 accounts
-					const response = await this.$api.getUsers({ limit: 5 });
-					// Response structure: { success: true, message: "...", data: { data: [...], pagination: {...} } }
-					this.recentAccounts = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
-				} catch (error) {
-					console.error('Failed to load recent accounts:', error);
+		async loadAllAccounts() {
+			this.tableLoading = true;
+			try {
+				const response = await this.$api.getUsers({ 
+					limit: this.pageSize,
+					page: this.currentPage
+				});
+				const users = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+				// Ensure each user has a fullName property for the table display
+				this.allAccounts = Array.isArray(users) ? users.map(u => ({
+					...u,
+					fullName: `${u.first_name || ''} ${u.last_name || ''}`.trim()
+				})) : [];
+				
+				// Update pagination total
+				if (response.data && response.data.pagination) {
+					this.totalUsers = response.data.pagination.total || this.allAccounts.length;
+				} else {
+					this.totalUsers = this.allAccounts.length;
 				}
+				
+				// Update pagination object
+				this.pagination = {
+					...this.pagination,
+					current: this.currentPage,
+					pageSize: this.pageSize,
+					total: this.totalUsers
+				};
+			} catch (error) {
+				console.error('Failed to load accounts:', error);
+				this.$message.error('Failed to load user accounts');
+			} finally {
+				this.tableLoading = false;
+			}
+		},
+
+		handleTableChange(pagination, filters, sorter) {
+			this.currentPage = pagination.current;
+			this.pageSize = pagination.pageSize;
+			this.loadAllAccounts();
+		},
+
+		async loadAccountStats() {
+			try {
+				const response = await this.$api.getUsers({ limit: 10000 });
+				const users = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+				
+				if (!Array.isArray(users)) {
+					console.error('Users data is not an array:', users);
+					return;
+				}
+				
+				this.accountStats = {
+					total: users.length,
+					admins: users.filter(user => user.role === 'admin').length,
+					judgers: users.filter(user => user.role === 'judger').length,
+					reporters: users.filter(user => user.role === 'reporter').length
+				};
+			} catch (error) {
+				console.error('Failed to load account stats:', error);
+			}
+		},
+
+			editUser(user) {
+				this.isEditMode = true;
+				this.editingUserId = user.id;
+				
+				// Populate form with user data
+				this.$nextTick(() => {
+					this.form.setFieldsValue({
+						username: user.username,
+						email: user.email,
+						firstName: user.first_name || '',
+						lastName: user.last_name || '',
+						role: user.role,
+						password: '' // Leave password empty, user can set it if needed
+					});
+				});
+
+				// Scroll to form
+				window.scrollTo({ top: 0, behavior: 'smooth' });
 			},
 
-			async loadAccountStats() {
-				try {
-					// Get all users to calculate stats
-					const response = await this.$api.getUsers({ limit: 1000 });
-					// Response structure: { success: true, message: "...", data: { data: [...], pagination: {...} } }
-					const users = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
-					
-					// Ensure users is an array
-					if (!Array.isArray(users)) {
-						console.error('Users data is not an array:', users);
-						return;
+			showDeleteConfirm(user) {
+				const self = this;
+				this.$confirm({
+					title: 'Confirm Delete',
+					content: `Are you sure you want to delete the user "${user.username}"? This action cannot be undone.`,
+					okText: 'Yes, Delete',
+					okType: 'danger',
+					cancelText: 'Cancel',
+					onOk() {
+						return self.deleteUser(user.id);
 					}
-					
-					// Calculate stats
-					this.accountStats = {
-						total: users.length,
-						admins: users.filter(user => user.role === 'admin').length,
-						judgers: users.filter(user => user.role === 'judger').length,
-						reporters: users.filter(user => user.role === 'reporter').length
-					};
+				});
+			},
+
+			async deleteUser(userId) {
+				try {
+					await this.$api.deleteUser(userId);
+					this.$message.success('User deleted successfully!');
+					// Refresh the user list and stats
+					this.loadAllAccounts();
+					this.loadAccountStats();
 				} catch (error) {
-					console.error('Failed to load account stats:', error);
+					this.$message.error(error.message || 'Failed to delete user');
 				}
 			}
 		},
 
 		created() {
 			// Load initial data
-			this.loadRecentAccounts();
+			this.loadAllAccounts();
 			this.loadAccountStats();
 		}
 	})
@@ -314,6 +465,23 @@
 		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
+	}
+}
+
+.action-link {
+	color: #1890ff;
+	transition: color 0.3s;
+	
+	&:hover {
+		color: #40a9ff;
+	}
+	
+	&.danger {
+		color: #ff4d4f;
+		
+		&:hover {
+			color: #ff7875;
+		}
 	}
 }
 </style>

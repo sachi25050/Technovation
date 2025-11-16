@@ -297,6 +297,32 @@ class ApiService {
   }
 
   /**
+   * Update an institution
+   * @param {number} institutionId - Institution ID
+   * @param {Object} institutionData - Institution data to update
+   * @returns {Promise} - API response
+   */
+  async updateInstitution(institutionId, institutionData) {
+    // For updates, we need to send awardCategories as JSON string if present
+    const dataToSend = { ...institutionData };
+    
+    if (dataToSend.awardCategories && Array.isArray(dataToSend.awardCategories)) {
+      dataToSend.awardCategories = JSON.stringify(dataToSend.awardCategories);
+    }
+    
+    return this.put(`/admin/institutions/${institutionId}`, dataToSend);
+  }
+
+  /**
+   * Delete an institution
+   * @param {number} institutionId - Institution ID
+   * @returns {Promise} - API response
+   */
+  async deleteInstitution(institutionId) {
+    return this.delete(`/admin/institutions/${institutionId}`);
+  }
+
+  /**
    * Create a new award
    * @param {Object} awardData - Award data (awardCategory, awardDescription, presentationWeightage, preliminaryWeightage)
    * @returns {Promise} - API response

@@ -132,7 +132,7 @@
 
 						<a-form-item>
 							<a-button type="primary" html-type="submit" :loading="loading" size="large">
-								Add Institution
+								{{ isEditMode ? 'Update Institution' : 'Add Institution' }}
 							</a-button>
 							<a-button style="margin-left: 8px;" @click="resetForm" size="large">
 								Reset
@@ -143,23 +143,7 @@
 			</a-col>
 
 			<a-col :span="24" :lg="8">
-				<a-card title="Recent Institutions" class="mb-24">
-					<a-list :data-source="recentInstitutions" size="small">
-						<a-list-item slot="renderItem" slot-scope="item">
-							<a-list-item-meta>
-								<a slot="title">{{ item.name }}</a>
-								<template slot="description">
-									{{ item.type }} • {{ item.contactPerson }}
-								</template>
-							</a-list-item-meta>
-							<template slot="actions">
-								<a-tag :color="getTypeColor(item.type)">{{ item.type }}</a-tag>
-							</template>
-						</a-list-item>
-					</a-list>
-				</a-card>
-
-				<a-card title="Institution Statistics">
+				<a-card title="Institution Statistics" class="mb-24">
 					<a-row :gutter="16">
 						<a-col :span="12">
 							<div class="stat-item">
@@ -191,6 +175,46 @@
 				</a-card>
 			</a-col>
 		</a-row>
+
+		<!-- Institution Management Table -->
+		<a-card title="Manage Institutions" class="mb-24">
+			<a-table
+				:columns="institutionTableColumns"
+				:data-source="allInstitutions"
+				:loading="tableLoading"
+				:pagination="institutionPagination"
+				@change="handleInstitutionTableChange"
+				:scroll="{ x: 1200 }"
+				size="small"
+				rowKey="id"
+			>
+				<template slot="image" slot-scope="text">
+					<img :src="text" :alt="text" style="height: 40px; border-radius: 4px;" v-if="text" />
+					<span v-else>No image</span>
+				</template>
+				<template slot="awards" slot-scope="text, record">
+					<span v-if="!record.awards || !Array.isArray(record.awards) || record.awards.length === 0">
+						No awards
+					</span>
+					<span v-else>
+						{{ record.awards.length }} award(s): 
+						<span v-for="(award, index) in record.awards" :key="award.id || index">
+							{{ award.award_number || (award.category ? award.category.split(' - ')[0] : 'Award') }}
+							<span v-if="index < record.awards.length - 1">, </span>
+						</span>
+					</span>
+				</template>
+				<template slot="action" slot-scope="text, record">
+					<a href="javascript:void(0);" @click="editInstitution(record)" class="action-link">
+						<a-icon type="edit" /> Edit
+					</a>
+					<a-divider type="vertical" />
+					<a href="javascript:void(0);" @click="showDeleteInstitutionConfirm(record)" class="action-link danger">
+						<a-icon type="delete" /> Delete
+					</a>
+				</template>
+			</a-table>
+		</a-card>
 	</div>
 </template>
 
@@ -202,6 +226,55 @@
 			return {
 				form: this.$form.createForm(this),
 				loading: false,
+				tableLoading: false,
+				allInstitutions: [],
+				isEditMode: false,
+				editingInstitutionId: null,
+				currentPage: 1,
+				pageSize: 10,
+				totalInstitutions: 0,
+				institutionPagination: {
+					current: 1,
+					pageSize: 10,
+					total: 0,
+					showTotal: (total) => `Total ${total} institutions`,
+					showSizeChanger: true,
+					showQuickJumper: true,
+					pageSizeOptions: ['10', '20', '50', '100']
+				},
+				institutionTableColumns: [
+					{
+						title: 'Institution Name',
+						dataIndex: 'name',
+						key: 'name',
+						width: 150
+					},
+					{
+						title: 'Email',
+						dataIndex: 'contact_email',
+						key: 'email',
+						width: 180
+					},
+					{
+						title: 'Image',
+						dataIndex: 'image_url',
+						key: 'image',
+						width: 100,
+						scopedSlots: { customRender: 'image' }
+					},
+					{
+						title: 'Awards',
+						key: 'awards',
+						width: 200,
+						scopedSlots: { customRender: 'awards' }
+					},
+					{
+						title: 'Action',
+						key: 'action',
+						width: 120,
+						scopedSlots: { customRender: 'action' }
+					}
+				],
 				imageUrl: '',
 				imageFile: null,
 				uploadLoading: false,
@@ -213,33 +286,11 @@
 					'award-7': 'Award No. 7 - Best Digital Payment Innovation',
 					'award-8': 'Award No. 8 - Best Digital Payment Security'
 				},
-				recentInstitutions: [
-					{
-						name: 'University of Colombo',
-						type: 'university',
-						contactPerson: 'Dr. John Smith'
-					},
-					{
-						name: 'Colombo International School',
-						type: 'school',
-						contactPerson: 'Ms. Sarah Johnson'
-					},
-					{
-						name: 'Sri Lanka Institute of Technology',
-						type: 'college',
-						contactPerson: 'Prof. Michael Brown'
-					},
-					{
-						name: 'National Research Institute',
-						type: 'research',
-						contactPerson: 'Dr. Emily Davis'
-					}
-				],
 				institutionStats: {
-					total: 28,
-					universities: 8,
-					colleges: 12,
-					schools: 6
+					total: 0,
+					universities: 0,
+					colleges: 0,
+					schools: 0
 				}
 			}
 		},
@@ -301,7 +352,7 @@
 							// Prepare institution data matching the database schema
 							const institutionData = {
 								name: values.institutionName,
-								email: values.email, // Maps to contact_email in backend
+								email: values.email,
 								awardCategories: this.selectedAwards.map(award => ({
 									value: award.value,
 									label: award.label,
@@ -309,21 +360,33 @@
 								}))
 							};
 							
-							// Call API with image file if available
-							const response = await apiService.createInstitution(
-								institutionData,
-								this.imageFile
-							);
-							
-							if (response.success) {
-								this.$message.success(response.message || 'Institution added successfully!');
-								this.resetForm();
+							let response;
+							if (this.isEditMode && this.editingInstitutionId) {
+								// Update existing institution
+								response = await this.$api.updateInstitution(
+									this.editingInstitutionId,
+									institutionData
+								);
+								this.$message.success(response.message || 'Institution updated successfully!');
 							} else {
-								this.$message.error(response.message || 'Failed to add institution');
+								// Create new institution
+								response = await apiService.createInstitution(
+									institutionData,
+									this.imageFile
+								);
+								this.$message.success(response.message || 'Institution added successfully!');
+							}
+							
+							if (response.success || response.message) {
+								this.resetForm();
+								this.loadAllInstitutions();
+								this.loadInstitutionStats();
+							} else {
+								this.$message.error(response.message || 'Failed to save institution');
 							}
 						} catch (error) {
-							console.error('Error adding institution:', error);
-							this.$message.error(error.message || 'Failed to add institution. Please try again.');
+							console.error('Error saving institution:', error);
+							this.$message.error(error.message || 'Failed to save institution. Please try again.');
 						} finally {
 							this.loading = false;
 						}
@@ -350,6 +413,147 @@
 				};
 				return colors[type] || 'default';
 			},
+			async loadAllInstitutions() {
+			this.tableLoading = true;
+			try {
+				const response = await this.$api.getInstitutions({ 
+					limit: this.pageSize,
+					page: this.currentPage
+				});
+				const institutions = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+				this.allInstitutions = Array.isArray(institutions) ? institutions : [];
+				
+				// Debug: Log first institution to check awards data
+				if (this.allInstitutions.length > 0) {
+					console.log('Sample institution data:', this.allInstitutions[0]);
+					console.log('Awards for first institution:', this.allInstitutions[0].awards);
+				}
+				
+				// Update pagination total
+				if (response.data && response.data.pagination) {
+					this.totalInstitutions = response.data.pagination.total || this.allInstitutions.length;
+				} else {
+					this.totalInstitutions = this.allInstitutions.length;
+				}
+				
+				// Update pagination object
+				this.institutionPagination = {
+					...this.institutionPagination,
+					current: this.currentPage,
+					pageSize: this.pageSize,
+					total: this.totalInstitutions
+				};
+			} catch (error) {
+				console.error('Failed to load institutions:', error);
+				this.$message.error('Failed to load institutions');
+			} finally {
+				this.tableLoading = false;
+			}
+		},
+
+		handleInstitutionTableChange(pagination, filters, sorter) {
+			this.currentPage = pagination.current;
+			this.pageSize = pagination.pageSize;
+			this.loadAllInstitutions();
+		},
+
+		async loadInstitutionStats() {
+			try {
+				const response = await this.$api.getInstitutions({ limit: 10000 });
+				const institutions = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+				
+				if (!Array.isArray(institutions)) {
+					console.error('Institutions data is not an array:', institutions);
+					return;
+				}
+				
+				this.institutionStats = {
+					total: institutions.length,
+					universities: institutions.length,
+					colleges: 0,
+					schools: 0
+				};
+			} catch (error) {
+				console.error('Failed to load institution stats:', error);
+			}
+		},
+
+		editInstitution(institution) {
+			this.isEditMode = true;
+			this.editingInstitutionId = institution.id;
+			
+			// Populate form with institution data
+			this.$nextTick(() => {
+				this.form.setFieldsValue({
+					institutionName: institution.name,
+					email: institution.contact_email || institution.email
+				});
+				
+				// Load existing awards if any
+				if (institution.awards && Array.isArray(institution.awards) && institution.awards.length > 0) {
+					// Map awards from API format to frontend format
+					this.selectedAwards = institution.awards.map(award => {
+						// Determine award value from award_number or category
+						let awardValue = null;
+						if (award.award_number) {
+							// Map award_number to frontend value format
+							const numberMap = {
+								'14': 'award-14',
+								'6A': 'award-6a',
+								'6B': 'award-6b',
+								'7': 'award-7',
+								'8': 'award-8'
+							};
+							awardValue = numberMap[award.award_number] || award.award_number;
+						} else if (award.value) {
+							awardValue = award.value;
+						}
+						
+						return {
+							value: awardValue,
+							label: award.category || this.awardOptions[awardValue] || 'Award',
+							marks: award.marks || 0
+						};
+					});
+				} else {
+					this.selectedAwards = [];
+				}
+				
+				// Load existing image if any
+				if (institution.image_url) {
+					this.imageUrl = institution.image_url;
+				}
+			});
+
+			// Scroll to form
+			window.scrollTo({ top: 0, behavior: 'smooth' });
+		},
+
+		showDeleteInstitutionConfirm(institution) {
+			const self = this;
+			this.$confirm({
+				title: 'Confirm Delete',
+				content: `Are you sure you want to delete "${institution.name}"? This action cannot be undone.`,
+				okText: 'Yes, Delete',
+				okType: 'danger',
+				cancelText: 'Cancel',
+				onOk() {
+					return self.deleteInstitution(institution.id);
+				}
+			});
+		},
+
+		async deleteInstitution(institutionId) {
+			try {
+				await this.$api.deleteInstitution(institutionId);
+				this.$message.success('Institution deleted successfully!');
+				// Refresh the institutions list and stats
+				this.loadAllInstitutions();
+				this.loadInstitutionStats();
+			} catch (error) {
+				this.$message.error(error.message || 'Failed to delete institution');
+			}
+		},
 			beforeUpload(file) {
 				// Validate file type
 				const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
@@ -413,15 +617,21 @@
 				if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
 					URL.revokeObjectURL(this.imageUrl);
 				}
-				this.imageFile = null;
-				this.imageUrl = '';
-				this.form.setFieldsValue({ instituteImage: null });
-				this.$message.info('Image removed. You can upload a new image.', 3);
-			}
+			this.imageFile = null;
+			this.imageUrl = '';
+			this.form.setFieldsValue({ instituteImage: null });
+			this.$message.info('Image removed. You can upload a new image.', 3);
 		}
-	})
-
-</script>
+		
+	},
+	
+	created() {
+		// Load initial data
+		this.loadAllInstitutions();
+		this.loadInstitutionStats();
+	}
+		
+	})</script>
 
 <style lang="scss">
 .page-header {
@@ -459,7 +669,22 @@
 		letter-spacing: 0.5px;
 	}
 }
-
+.action-link {
+	color: #1890ff;
+	transition: color 0.3s;
+	
+	&:hover {
+		color: #40a9ff;
+	}
+	
+	&.danger {
+		color: #ff4d4f;
+		
+		&:hover {
+			color: #ff7875;
+		}
+	}
+}
 // Selected Awards Container Styles
 .selected-awards-container {
 	margin-top: 16px;
