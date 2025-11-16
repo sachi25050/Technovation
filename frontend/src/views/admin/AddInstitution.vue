@@ -195,8 +195,16 @@
 				rowKey="id"
 			>
 				<template slot="image" slot-scope="text">
-					<img :src="text" :alt="text" style="height: 40px; border-radius: 4px;" v-if="text" />
-					<span v-else>No image</span>
+					<div class="institution-image-tile" v-if="text">
+						<img 
+							:src="text" 
+							:alt="'Institution image'" 
+							class="institution-image"
+							@error="handleTableImageError($event, text)"
+							@load="handleTableImageLoad"
+						/>
+					</div>
+					<span v-else class="no-image-text">No image</span>
 				</template>
 				<template slot="awards" slot-scope="text, record">
 					<span v-if="!record.awards || !Array.isArray(record.awards) || record.awards.length === 0">
@@ -423,6 +431,42 @@
 				};
 				return colors[type] || 'default';
 			},
+			normalizeImageUrl(imageUrl) {
+				if (!imageUrl) return null;
+				
+				// Convert to API endpoint URL if it's a backend/uploads path
+				if (imageUrl.includes('/backend/uploads/')) {
+					// Extract the relative path (e.g., institutions/filename.jpg)
+					const pathMatch = imageUrl.match(/\/backend\/uploads\/(.+)$/);
+					if (pathMatch && pathMatch[1]) {
+						// Use the API uploads endpoint
+						const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+						return `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+					}
+				}
+				
+				// Fix URL if it's missing the port (backend runs on port 8000)
+				if (imageUrl.includes('localhost/') && !imageUrl.includes('localhost:')) {
+					imageUrl = imageUrl.replace('http://localhost/', 'http://localhost:8000/');
+					imageUrl = imageUrl.replace('https://localhost/', 'https://localhost:8000/');
+				}
+				
+				// Ensure the URL is absolute
+				if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('blob:')) {
+					// If it's a relative URL, make it absolute
+					if (imageUrl.startsWith('//')) {
+						imageUrl = window.location.protocol + imageUrl;
+					} else if (imageUrl.startsWith('/')) {
+						// Absolute path from root - use localhost:8000 as backend base
+						imageUrl = 'http://localhost:8000' + imageUrl;
+					} else {
+						// Relative path
+						imageUrl = 'http://localhost:8000/' + imageUrl;
+					}
+				}
+				
+				return imageUrl;
+			},
 			async loadAllInstitutions() {
 			this.tableLoading = true;
 			try {
@@ -431,7 +475,14 @@
 					page: this.currentPage
 				});
 				const institutions = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
-				this.allInstitutions = Array.isArray(institutions) ? institutions : [];
+				
+				// Normalize image URLs for all institutions
+				this.allInstitutions = institutions.map(institution => {
+					if (institution.image_url) {
+						institution.image_url = this.normalizeImageUrl(institution.image_url);
+					}
+					return institution;
+				});
 				
 				// Debug: Log first institution to check awards data
 				if (this.allInstitutions.length > 0) {
@@ -539,42 +590,7 @@
 				
 				// Load existing image if any - ensure it's a valid URL
 				if (institution.image_url) {
-					// Use the full URL from the API response
-					let imageUrl = institution.image_url;
-					
-					// Convert to API endpoint URL if it's a backend/uploads path
-					// Extract the path from URLs like http://localhost:8000/backend/uploads/institutions/filename.jpg
-					if (imageUrl.includes('/backend/uploads/')) {
-						// Extract the relative path (e.g., institutions/filename.jpg)
-						const pathMatch = imageUrl.match(/\/backend\/uploads\/(.+)$/);
-						if (pathMatch && pathMatch[1]) {
-							// Use the API uploads endpoint
-							const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
-							imageUrl = `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
-						}
-					}
-					
-					// Fix URL if it's missing the port (backend runs on port 8000)
-					if (imageUrl && imageUrl.includes('localhost/') && !imageUrl.includes('localhost:')) {
-						imageUrl = imageUrl.replace('http://localhost/', 'http://localhost:8000/');
-						imageUrl = imageUrl.replace('https://localhost/', 'https://localhost:8000/');
-					}
-					
-					// Ensure the URL is absolute
-					if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('blob:')) {
-						// If it's a relative URL, make it absolute
-						if (imageUrl.startsWith('//')) {
-							imageUrl = window.location.protocol + imageUrl;
-						} else if (imageUrl.startsWith('/')) {
-							// Absolute path from root - use localhost:8000 as backend base
-							imageUrl = 'http://localhost:8000' + imageUrl;
-						} else {
-							// Relative path
-							imageUrl = 'http://localhost:8000/' + imageUrl;
-						}
-					}
-					
-					this.imageUrl = imageUrl;
+					this.imageUrl = this.normalizeImageUrl(institution.image_url);
 					console.log('Loading image for edit:', this.imageUrl);
 				} else {
 					// Clear image if no URL
@@ -747,6 +763,28 @@
 			handleImageLoad(event) {
 				// Image loaded successfully
 				console.log('Image loaded successfully:', this.imageUrl);
+			},
+			handleTableImageError(event, imageUrl) {
+				// Handle image loading errors in table
+				console.error('Table image failed to load:', imageUrl);
+				
+				// Try to fix the URL if it's malformed
+				if (imageUrl && !imageUrl.includes('/api/uploads')) {
+					// Try converting to API endpoint
+					const normalizedUrl = this.normalizeImageUrl(imageUrl);
+					if (normalizedUrl && normalizedUrl !== imageUrl) {
+						// Update the src to try the normalized URL
+						event.target.src = normalizedUrl;
+						return;
+					}
+				}
+				
+				// If still fails, hide the broken image
+				event.target.style.display = 'none';
+			},
+			handleTableImageLoad(event) {
+				// Image loaded successfully in table
+				event.target.style.display = 'block';
 			}
 		},
 	
@@ -809,6 +847,32 @@
 			color: #ff7875;
 		}
 	}
+}
+
+// Institution Image Tile Styles
+.institution-image-tile {
+	width: 80px;
+	height: 80px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px;
+	background-color: #ffffff;
+	box-sizing: border-box;
+}
+
+.institution-image {
+	max-width: 100%;
+	max-height: 100%;
+	width: auto;
+	height: auto;
+	object-fit: contain;
+	display: block;
+}
+
+.no-image-text {
+	color: #8c8c8c;
+	font-size: 12px;
 }
 // Selected Awards Container Styles
 .selected-awards-container {
