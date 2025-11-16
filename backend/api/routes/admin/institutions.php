@@ -200,7 +200,16 @@ switch ($method) {
                 try {
                     // Extract award information from different formats
                     $awardValue = is_array($award) ? ($award['value'] ?? null) : $award;
-                    $marks = is_array($award) ? ($award['marks'] ?? 0) : 0;
+                    
+                    // Extract and validate marks - ensure it's a numeric value
+                    $marksRaw = is_array($award) ? ($award['marks'] ?? null) : null;
+                    $marks = 0;
+                    if ($marksRaw !== null && $marksRaw !== '') {
+                        // Convert to float, default to 0 if invalid
+                        $marks = is_numeric($marksRaw) ? (float)$marksRaw : 0;
+                        // Ensure marks is non-negative
+                        $marks = max(0, $marks);
+                    }
                     
                     error_log("  Processing award: value=" . $awardValue . ", marks=" . $marks);
                     
@@ -230,9 +239,11 @@ switch ($method) {
                         
                         if ($awardRecord) {
                             $awardId = $awardRecord['id'];
-                            error_log("    Found award in database: award_id=" . $awardId . ", award_number=" . $awardNumber);
+                            error_log("    Found award in database: award_id=" . $awardId . ", award_number=" . $awardNumber . ", marks=" . $marks);
+                            
+                            // Insert into institution_awards table with award_id and marks
                             $insertStmt->execute([$institutionId, $awardId, $marks]);
-                            error_log("    Successfully inserted award");
+                            error_log("    Successfully inserted into institution_awards: institution_id=" . $institutionId . ", award_id=" . $awardId . ", marks=" . $marks);
                         } else {
                             error_log("    ERROR: Award number '{$awardNumber}' (from '{$awardValue}') not found in database. Please run: php database/setup_awards.php");
                         }
@@ -241,7 +252,7 @@ switch ($method) {
                     }
                 } catch (PDOException $e) {
                     // Log error but continue with other awards
-                    error_log("    ERROR inserting award: " . $e->getMessage());
+                    error_log("    ERROR inserting award into institution_awards: " . $e->getMessage());
                 }
             }
         } else {
@@ -395,7 +406,16 @@ switch ($method) {
             foreach ($awardCategories as $award) {
                 try {
                     $awardValue = is_array($award) ? ($award['value'] ?? null) : $award;
-                    $marks = is_array($award) ? ($award['marks'] ?? 0) : 0;
+                    
+                    // Extract and validate marks - ensure it's a numeric value
+                    $marksRaw = is_array($award) ? ($award['marks'] ?? null) : null;
+                    $marks = 0;
+                    if ($marksRaw !== null && $marksRaw !== '') {
+                        // Convert to float, default to 0 if invalid
+                        $marks = is_numeric($marksRaw) ? (float)$marksRaw : 0;
+                        // Ensure marks is non-negative
+                        $marks = max(0, $marks);
+                    }
                     
                     if (empty($awardValue)) {
                         continue;
@@ -420,7 +440,9 @@ switch ($method) {
                         
                         if ($awardRecord) {
                             $awardId = $awardRecord['id'];
+                            // Insert into institution_awards table with award_id and marks
                             $insertStmt->execute([$id, $awardId, $marks]);
+                            error_log("Updated institution_awards: institution_id={$id}, award_id={$awardId}, marks={$marks}");
                         } else {
                             error_log("Warning: Award number '{$awardNumber}' (from '{$awardValue}') not found in database during update. Please run: php database/setup_awards.php");
                         }
