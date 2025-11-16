@@ -226,21 +226,40 @@ switch ($method) {
             Response::error('Account ID is required', null, 400);
         }
         
+        // Prevent deleting own account
+        $currentUserId = $user['user_id'] ?? $user['id'] ?? null;
+        if ($currentUserId && $id == $currentUserId) {
+            Response::error('You cannot delete your own account', null, 403);
+        }
+        
         // Check if account exists
-        $checkStmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+        $checkStmt = $db->prepare("SELECT id, role FROM users WHERE id = ?");
         $checkStmt->execute([$id]);
-        if (!$checkStmt->fetch()) {
+        $accountToDelete = $checkStmt->fetch();
+        
+        if (!$accountToDelete) {
             Response::notFound('Account not found');
         }
         
-        // Soft delete (set status to inactive) or hard delete
-        // For safety, we'll do soft delete
-        $stmt = $db->prepare("UPDATE users SET status = 'inactive' WHERE id = ?");
+        // Prevent deleting the last admin account
+        if ($accountToDelete['role'] === 'admin') {
+            $adminCountStmt = $db->query("SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND status = 'active'");
+            $adminCount = $adminCountStmt->fetch()['count'];
+            if ($adminCount <= 1) {
+                Response::error('Cannot delete the last admin account', null, 403);
+            }
+        }
+        
+        // Hard delete - actually remove the record from database
+        $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$id]);
         
-        // Or hard delete (uncomment if needed):
-        // $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
-        // $stmt->execute([$id]);
+        // Check if deletion was successful
+        $verifyStmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+        $verifyStmt->execute([$id]);
+        if ($verifyStmt->fetch()) {
+            Response::error('Failed to delete account', null, 500);
+        }
         
         Response::success('Account deleted successfully');
         break;
