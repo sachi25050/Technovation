@@ -55,8 +55,14 @@
           
           <!-- User Info -->
           <div class="user-info">
-            <div class="user-avatar">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <div class="user-avatar" :class="{ 'has-image': currentUser.profile_image }">
+              <img 
+                v-if="currentUser.profile_image" 
+                :src="getProfileImageUrl(currentUser.profile_image)" 
+                :alt="currentUser.name || 'User'"
+                @error="handleImageError"
+              />
+              <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
               </svg>
@@ -106,7 +112,8 @@ export default {
       sidebarCollapsed: false,
       currentUser: {
         name: 'John Doe',
-        email: 'john.doe@lankapay.com'
+        email: 'john.doe@lankapay.com',
+        profile_image: null
       }
     }
   },
@@ -170,6 +177,42 @@ export default {
         userRoleStore.setRole('admin')
         this.$router.push('/sign-in')
       }
+    },
+    getProfileImageUrl(imageUrl) {
+      if (!imageUrl) return null;
+      
+      // Convert to API endpoint URL if it's a backend/uploads path
+      if (imageUrl.includes('/backend/uploads/')) {
+        const pathMatch = imageUrl.match(/\/backend\/uploads\/(.+)$/);
+        if (pathMatch && pathMatch[1]) {
+          const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+          return `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+        }
+      }
+      
+      // Fix URL if it's missing the port
+      if (imageUrl.includes('localhost/') && !imageUrl.includes('localhost:')) {
+        imageUrl = imageUrl.replace('http://localhost/', 'http://localhost:8000/');
+        imageUrl = imageUrl.replace('https://localhost/', 'https://localhost:8000/');
+      }
+      
+      // Ensure the URL is absolute
+      if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('blob:')) {
+        if (imageUrl.startsWith('//')) {
+          imageUrl = window.location.protocol + imageUrl;
+        } else if (imageUrl.startsWith('/')) {
+          imageUrl = 'http://localhost:8000' + imageUrl;
+        } else {
+          imageUrl = 'http://localhost:8000/' + imageUrl;
+        }
+      }
+      
+      return imageUrl;
+    },
+    handleImageError(event) {
+      // Hide broken image and show default avatar
+      event.target.style.display = 'none';
+      this.currentUser.profile_image = null;
     }
   },
   mounted() {
@@ -180,8 +223,9 @@ export default {
     const user = apiService.getCurrentUser()
     if (user) {
       this.currentUser = {
-        name: user.name || user.username || 'John Doe',
-        email: user.email || 'john.doe@lankapay.com'
+        name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'John Doe',
+        email: user.email || 'john.doe@lankapay.com',
+        profile_image: user.profile_image || null
       }
     }
     
@@ -376,6 +420,26 @@ export default {
   align-items: center;
   justify-content: center;
   color: #007BFF;
+  overflow: hidden;
+  flex-shrink: 0;
+  
+  &.has-image {
+    background: transparent;
+    padding: 0;
+  }
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+  }
+  
+  svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 .user-details {

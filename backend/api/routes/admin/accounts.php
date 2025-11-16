@@ -17,7 +17,13 @@ if ($user['role'] !== 'admin') {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
-$input = json_decode(file_get_contents('php://input'), true);
+// Handle both JSON and FormData requests
+$rawInput = file_get_contents('php://input');
+$input = json_decode($rawInput, true);
+// If JSON decode failed or input is empty, try reading from $_POST (FormData)
+if (json_last_error() !== JSON_ERROR_NONE || empty($input)) {
+    $input = $_POST;
+}
 
 // Get ID from URI if present
 $id = isset($_GET['_params'][0]) ? (int)$_GET['_params'][0] : (isset($_GET['params'][0]) ? (int)$_GET['params'][0] : null);
@@ -26,7 +32,7 @@ switch ($method) {
     case 'GET':
         if ($id) {
             // Get single account
-            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE id = ?");
+            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
             $stmt->execute([$id]);
             $account = $stmt->fetch();
             
@@ -56,7 +62,7 @@ switch ($method) {
             $total = $countStmt->fetch()['total'];
             
             // Get accounts
-            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?");
+            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?");
             $params[] = $limit;
             $params[] = $offset;
             $stmt->execute($params);
@@ -106,13 +112,31 @@ switch ($method) {
         // Hash password
         $hashedPassword = Auth::hashPassword($password);
         
-        // Insert user
-        $stmt = $db->prepare("INSERT INTO users (username, email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$username, $email, $hashedPassword, $firstName, $lastName, $role]);
+        // Handle image upload
+        $profileImage = null;
+        $profileImageUrl = null;
+        if (isset($_FILES['profileImage']) && $_FILES['profileImage']['error'] === UPLOAD_ERR_OK) {
+            try {
+                $imageInfo = FileUpload::uploadImage($_FILES['profileImage'], 'users');
+                $profileImage = $imageInfo['path'];
+                $profileImageUrl = $imageInfo['url'];
+            } catch (Exception $e) {
+                Response::error('Image upload failed: ' . $e->getMessage());
+            }
+        }
+        
+        // Insert user - include profile_image if provided
+        if ($profileImage) {
+            $stmt = $db->prepare("INSERT INTO users (username, email, password, first_name, last_name, role, profile_image) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$username, $email, $hashedPassword, $firstName, $lastName, $role, $profileImageUrl]);
+        } else {
+            $stmt = $db->prepare("INSERT INTO users (username, email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$username, $email, $hashedPassword, $firstName, $lastName, $role]);
+        }
         $userId = $db->lastInsertId();
         
         // Get created user
-        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $account = $stmt->fetch();
         
@@ -203,6 +227,33 @@ switch ($method) {
             $params[] = $status;
         }
         
+        // Handle image upload
+        if (isset($_FILES['profileImage']) && $_FILES['profileImage']['error'] === UPLOAD_ERR_OK) {
+            // Delete old image if exists
+            $oldStmt = $db->prepare("SELECT profile_image FROM users WHERE id = ?");
+            $oldStmt->execute([$id]);
+            $oldUser = $oldStmt->fetch();
+            if ($oldUser && $oldUser['profile_image']) {
+                // Extract filename from URL or path
+                $oldImagePath = $oldUser['profile_image'];
+                if (strpos($oldImagePath, '/backend/uploads/') !== false) {
+                    $pathMatch = preg_match('/\/backend\/uploads\/users\/(.+)$/', $oldImagePath, $matches);
+                    if ($pathMatch && isset($matches[1])) {
+                        FileUpload::deleteFile($matches[1], 'users');
+                    }
+                }
+            }
+            
+            try {
+                $imageInfo = FileUpload::uploadImage($_FILES['profileImage'], 'users');
+                $profileImageUrl = $imageInfo['url'];
+                $updates[] = "profile_image = ?";
+                $params[] = $profileImageUrl;
+            } catch (Exception $e) {
+                Response::error('Image upload failed: ' . $e->getMessage());
+            }
+        }
+        
         if (empty($updates)) {
             Response::error('No fields to update', null, 400);
         }
@@ -213,7 +264,7 @@ switch ($method) {
         $stmt->execute($params);
         
         // Get updated user
-        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, created_at FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
         $stmt->execute([$id]);
         $account = $stmt->fetch();
         

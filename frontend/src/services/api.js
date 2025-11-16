@@ -162,20 +162,132 @@ class ApiService {
   /**
    * Create a new user account
    * @param {Object} userData - User data (username, email, password, first_name, last_name, role)
+   * @param {File} imageFile - Optional profile image file
    * @returns {Promise} - API response
    */
-  async createUser(userData) {
-    return this.post('/admin/accounts', userData);
+  async createUser(userData, imageFile = null) {
+    // If image file is provided, use FormData
+    if (imageFile) {
+      const formData = new FormData();
+      
+      // Add all user data fields
+      Object.keys(userData).forEach(key => {
+        if (userData[key] !== null && userData[key] !== undefined) {
+          formData.append(key, userData[key]);
+        }
+      });
+      
+      // Add image file
+      formData.append('profileImage', imageFile);
+      
+      // Make request with FormData
+      const url = `${API_BASE_URL}/admin/accounts`;
+      const token = localStorage.getItem('auth_token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      // Don't set Content-Type for FormData, browser will set it with boundary
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: formData,
+      });
+      
+      // Read response as text first (we can only read the body once)
+      const text = await response.text();
+      let data;
+      
+      // Try to parse as JSON
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // If parsing fails, it's likely HTML or plain text error
+        if (!response.ok) {
+          const error = new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+          error.status = response.status;
+          throw error;
+        }
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 200)}`);
+      }
+      
+      if (!response.ok) {
+        const error = new Error(data.message || data.error || 'An error occurred');
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+      
+      return data;
+    } else {
+      // No image, use regular JSON POST
+      return this.post('/admin/accounts', userData);
+    }
   }
 
   /**
    * Update a user account
    * @param {number} userId - User ID
    * @param {Object} userData - User data to update
+   * @param {File} imageFile - Optional profile image file
    * @returns {Promise} - API response
    */
-  async updateUser(userId, userData) {
-    return this.put(`/admin/accounts/${userId}`, userData);
+  async updateUser(userId, userData, imageFile = null) {
+    // If image file is provided, use FormData
+    if (imageFile) {
+      const formData = new FormData();
+      
+      // Add all user data fields
+      Object.keys(userData).forEach(key => {
+        if (userData[key] !== null && userData[key] !== undefined) {
+          formData.append(key, userData[key]);
+        }
+      });
+      
+      // Add image file
+      formData.append('profileImage', imageFile);
+      
+      // Make request with FormData
+      const url = `${API_BASE_URL}/admin/accounts/${userId}`;
+      const token = localStorage.getItem('auth_token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      // Don't set Content-Type for FormData, browser will set it with boundary
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: headers,
+        body: formData
+      });
+      
+      const text = await response.text();
+      let data;
+      
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        if (!response.ok) {
+          const error = new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+          error.status = response.status;
+          throw error;
+        }
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 200)}`);
+      }
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update user');
+      }
+      
+      return data;
+    } else {
+      // No image file, send as JSON
+      return this.put(`/admin/accounts/${userId}`, userData);
+    }
   }
 
   /**

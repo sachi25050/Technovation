@@ -25,7 +25,7 @@ if (empty($username) || empty($password)) {
 $db = Database::getInstance()->getConnection();
 
 // Find user
-$stmt = $db->prepare("SELECT * FROM users WHERE username = ? AND status = 'active'");
+$stmt = $db->prepare("SELECT id, username, email, password, first_name, last_name, role, status, profile_image FROM users WHERE username = ? AND status = 'active'");
 $stmt->execute([$username]);
 $user = $stmt->fetch();
 
@@ -45,7 +45,8 @@ Response::success('Login successful', [
         'email' => $user['email'],
         'role' => $user['role'],
         'first_name' => $user['first_name'],
-        'last_name' => $user['last_name']
+        'last_name' => $user['last_name'],
+        'profile_image' => $user['profile_image'] ?? null
     ]
 ]);
 
