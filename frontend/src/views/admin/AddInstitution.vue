@@ -102,12 +102,15 @@
 								mode="multiple"
 								placeholder="Select award categories"
 								style="width: 100%"
+								:loading="awardsLoading"
 							>
-								<a-select-option value="award-14">Award No. 14 - Financial Institution of the Year for Best Digital Payment</a-select-option>
-								<a-select-option value="award-6a">Award No. 6A - Most Popular Digital Payment Product - State Banks</a-select-option>
-								<a-select-option value="award-6b">Award No. 6B - Most Popular Digital Payment Product - Private Banks</a-select-option>
-								<a-select-option value="award-7">Award No. 7 - Best Digital Payment Innovation</a-select-option>
-								<a-select-option value="award-8">Award No. 8 - Best Digital Payment Security</a-select-option>
+								<a-select-option 
+									v-for="award in availableAwards" 
+									:key="award.id" 
+									:value="getAwardValue(award)"
+								>
+									{{ award.category }}
+								</a-select-option>
 							</a-select>
 							
 							<!-- Display selected awards with mark input -->
@@ -293,13 +296,8 @@
 				imageFile: null,
 				uploadLoading: false,
 				selectedAwards: [],
-				awardOptions: {
-					'award-14': 'Award No. 14 - Financial Institution of the Year for Best Digital Payment',
-					'award-6a': 'Award No. 6A - Most Popular Digital Payment Product - State Banks',
-					'award-6b': 'Award No. 6B - Most Popular Digital Payment Product - Private Banks',
-					'award-7': 'Award No. 7 - Best Digital Payment Innovation',
-					'award-8': 'Award No. 8 - Best Digital Payment Security'
-				},
+				availableAwards: [],
+				awardsLoading: false,
 				institutionStats: {
 					total: 0,
 					universities: 0,
@@ -311,6 +309,15 @@
 		computed: {
 			selectedAwardValues() {
 				return this.selectedAwards.map(award => award.value);
+			},
+			awardOptions() {
+				// Build awardOptions object from availableAwards
+				const options = {};
+				this.availableAwards.forEach(award => {
+					const value = this.getAwardValue(award);
+					options[value] = award.category;
+				});
+				return options;
 			}
 		},
 		beforeDestroy() {
@@ -320,6 +327,27 @@
 			}
 		},
 		methods: {
+			/**
+			 * Get award value from award object (maps award_number to value format)
+			 * @param {Object} award - Award object with award_number
+			 * @returns {String} - Value in format like "award-14", "award-6a", etc.
+			 */
+			getAwardValue(award) {
+				if (!award || !award.award_number) {
+					return `award-${award.id}`;
+				}
+				// Convert award_number to lowercase and format as "award-{number}"
+				const awardNum = award.award_number.toString().toLowerCase();
+				return `award-${awardNum}`;
+			},
+			/**
+			 * Find award by value (reverse lookup)
+			 * @param {String} value - Value like "award-14", "award-6a", etc.
+			 * @returns {Object|null} - Award object or null
+			 */
+			findAwardByValue(value) {
+				return this.availableAwards.find(award => this.getAwardValue(award) === value);
+			},
 			handleAwardCategoryChange(selectedValues) {
 				// Find removed awards
 				const removedAwards = this.selectedAwards.filter(
@@ -335,9 +363,10 @@
 				selectedValues.forEach(value => {
 					const exists = this.selectedAwards.some(award => award.value === value);
 					if (!exists) {
+						const award = this.findAwardByValue(value);
 						this.selectedAwards.push({
 							value: value,
-							label: this.awardOptions[value],
+							label: award ? award.category : this.awardOptions[value] || value,
 							marks: null
 						});
 					}
@@ -538,6 +567,27 @@
 				console.error('Failed to load institution stats:', error);
 			}
 		},
+		async loadAwards() {
+			this.awardsLoading = true;
+			try {
+				const response = await apiService.getAwards({ limit: 1000 }); // Get all awards
+				const awards = (response.data && response.data.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+				
+				if (Array.isArray(awards)) {
+					this.availableAwards = awards;
+					console.log('Loaded awards:', this.availableAwards);
+				} else {
+					console.error('Awards data is not an array:', awards);
+					this.availableAwards = [];
+				}
+			} catch (error) {
+				console.error('Failed to load awards:', error);
+				this.$message.error('Failed to load award categories. Please refresh the page.');
+				this.availableAwards = [];
+			} finally {
+				this.awardsLoading = false;
+			}
+		},
 
 		editInstitution(institution) {
 			this.isEditMode = true;
@@ -562,20 +612,20 @@
 				if (institution.awards && Array.isArray(institution.awards) && institution.awards.length > 0) {
 					// Map awards from API format to frontend format
 					this.selectedAwards = institution.awards.map(award => {
-						// Determine award value from award_number or category
+						// Determine award value from award_number
 						let awardValue = null;
 						if (award.award_number) {
-							// Map award_number to frontend value format
-							const numberMap = {
-								'14': 'award-14',
-								'6A': 'award-6a',
-								'6B': 'award-6b',
-								'7': 'award-7',
-								'8': 'award-8'
-							};
-							awardValue = numberMap[award.award_number] || award.award_number;
+							// Convert award_number to value format (e.g., "14" -> "award-14", "6A" -> "award-6a")
+							const awardNum = award.award_number.toString().toLowerCase();
+							awardValue = `award-${awardNum}`;
 						} else if (award.value) {
 							awardValue = award.value;
+						} else {
+							// Fallback: try to find by category
+							const foundAward = this.availableAwards.find(a => a.category === award.category);
+							if (foundAward) {
+								awardValue = this.getAwardValue(foundAward);
+							}
 						}
 						
 						return {
@@ -790,6 +840,7 @@
 	
 	created() {
 		// Load initial data
+		this.loadAwards();
 		this.loadAllInstitutions();
 		this.loadInstitutionStats();
 	}
