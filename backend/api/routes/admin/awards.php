@@ -98,7 +98,7 @@ switch ($method) {
                 Response::validationError(['criteria' => "Criterion #" . ($index + 1) . " name is required"]);
             }
             
-            $marks = isset($criterion['marks']) ? (float)$criterion['marks'] : null;
+            $marks = isset($criterion['allocated_marks']) ? (float)$criterion['allocated_marks'] : (isset($criterion['marks']) ? (float)$criterion['marks'] : null);
             if ($marks === null || $marks <= 0) {
                 Response::validationError(['criteria' => "Criterion #" . ($index + 1) . " allocated marks must be a positive number"]);
             }
