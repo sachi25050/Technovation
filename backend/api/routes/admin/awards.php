@@ -49,6 +49,13 @@ switch ($method) {
             $stmt->execute([$limit, $offset]);
             $awards = $stmt->fetchAll();
             
+            // Get criteria for each award
+            foreach ($awards as &$award) {
+                $criteriaStmt = $db->prepare("SELECT * FROM award_criteria WHERE award_id = ? ORDER BY display_order ASC");
+                $criteriaStmt->execute([$award['id']]);
+                $award['criteria'] = $criteriaStmt->fetchAll();
+            }
+            
             Response::success('Awards retrieved', [
                 'data' => $awards,
                 'pagination' => [

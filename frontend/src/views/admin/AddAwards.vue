@@ -253,6 +253,21 @@
 				size="small"
 				rowKey="id"
 			>
+				<template slot="criteria" slot-scope="text, record">
+					<div v-if="record.criteria && record.criteria.length > 0" class="criteria-display">
+						<div 
+							v-for="(criterion, index) in record.criteria" 
+							:key="index"
+							class="criterion-item-display"
+						>
+							<span class="criterion-name">{{ criterion.name }}</span>
+							<a-tag color="blue" class="criterion-marks">
+								{{ criterion.allocated_marks || criterion.marks || 0 }} marks
+							</a-tag>
+						</div>
+					</div>
+					<span v-else class="no-criteria">No criteria defined</span>
+				</template>
 				<template slot="action" slot-scope="text, record">
 					<a href="javascript:void(0);" @click="editAward(record)" class="action-link">
 						<a-icon type="edit" /> Edit
@@ -310,6 +325,12 @@
 						key: 'description',
 						width: 300,
 						ellipsis: true
+					},
+					{
+						title: 'Criteria & Marks',
+						key: 'criteria',
+						width: 350,
+						scopedSlots: { customRender: 'criteria' }
 					},
 					{
 						title: 'Presentation Weightage',
@@ -887,5 +908,44 @@
 		min-width: 50px;
 		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
 	}
+}
+
+// Criteria Display in Table
+.criteria-display {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.criterion-item-display {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	background: #f8fafc;
+	border-radius: 4px;
+	border-left: 3px solid #3b82f6;
+	
+	.criterion-name {
+		flex: 1;
+		font-size: 13px;
+		font-weight: 500;
+		color: #1e293b;
+		line-height: 1.4;
+	}
+	
+	.criterion-marks {
+		flex-shrink: 0;
+		font-size: 12px;
+		font-weight: 600;
+		margin: 0;
+	}
+}
+
+.no-criteria {
+	color: #94a3b8;
+	font-size: 13px;
+	font-style: italic;
 }
 </style>
