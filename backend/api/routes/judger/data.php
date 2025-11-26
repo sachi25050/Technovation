@@ -21,18 +21,47 @@ if (strpos($uri, 'institutions') !== false) {
     Response::success('Institutions retrieved', $institutions);
     
 } elseif (strpos($uri, 'awards') !== false) {
-    // Get all active awards with criteria summary
-    $stmt = $db->query("
-        SELECT a.*, 
-               COUNT(ac.id) as criteria_count,
-               SUM(ac.allocated_marks) as total_allocated
-        FROM awards a
-        LEFT JOIN award_criteria ac ON a.id = ac.award_id
-        WHERE a.status = 'active'
-        GROUP BY a.id
-        ORDER BY a.created_at DESC
-    ");
-    $awards = $stmt->fetchAll();
+    // Check if institution_id is provided
+    $institutionId = isset($_GET['institution_id']) ? (int)$_GET['institution_id'] : null;
+    
+    if ($institutionId) {
+        // Get awards for a specific institution
+        $stmt = $db->prepare("
+            SELECT DISTINCT a.id, 
+                   a.award_number,
+                   a.category,
+                   a.description,
+                   a.presentation_weightage,
+                   a.preliminary_weightage,
+                   a.status,
+                   a.created_at,
+                   a.updated_at,
+                   ia.marks as institution_marks,
+                   COUNT(ac.id) as criteria_count,
+                   SUM(ac.allocated_marks) as total_allocated
+            FROM awards a
+            INNER JOIN institution_awards ia ON a.id = ia.award_id
+            LEFT JOIN award_criteria ac ON a.id = ac.award_id
+            WHERE ia.institution_id = ? AND (a.status = 'active' OR a.status IS NULL)
+            GROUP BY a.id, a.award_number, a.category, a.description, a.presentation_weightage, a.preliminary_weightage, a.status, a.created_at, a.updated_at, ia.marks
+            ORDER BY a.created_at DESC
+        ");
+        $stmt->execute([$institutionId]);
+        $awards = $stmt->fetchAll();
+    } else {
+        // Get all active awards with criteria summary
+        $stmt = $db->query("
+            SELECT a.*, 
+                   COUNT(ac.id) as criteria_count,
+                   SUM(ac.allocated_marks) as total_allocated
+            FROM awards a
+            LEFT JOIN award_criteria ac ON a.id = ac.award_id
+            WHERE a.status = 'active' OR a.status IS NULL
+            GROUP BY a.id
+            ORDER BY a.created_at DESC
+        ");
+        $awards = $stmt->fetchAll();
+    }
     
     Response::success('Awards retrieved', $awards);
     

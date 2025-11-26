@@ -18,29 +18,44 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 						<div class="form-row">
 							<div class="form-field judge-field">
 								<label>Name of the Judge</label>
-								<a-input v-model="judgeName" placeholder="Mr. Asita D B Talwatta" readonly />
+								<a-input v-model="judgeName"  :placeholder="currentUser.name"  readonly />
+								
 							</div>
 							<div class="form-field institute-field">
 								<label>Institute Name</label>
-								<a-select v-model="selectedInstitute" placeholder="Select Institute" @change="onInstituteChange">
-									<a-select-option value="bank-ceylon">Bank of Ceylon</a-select-option>
-									<a-select-option value="commercial-bank">Commercial Bank of Ceylon PLC</a-select-option>
-									<a-select-option value="peoples-bank">People's Bank</a-select-option>
-									<a-select-option value="sampath-bank">Sampath Bank PLC</a-select-option>
-									<a-select-option value="hatton-national">Hatton National Bank PLC</a-select-option>
-									<a-select-option value="ndb-bank">NDB Bank</a-select-option>
+								<a-select 
+									v-model="selectedInstitute" 
+									placeholder="Select Institute" 
+									@change="onInstituteChange"
+									:loading="institutionsLoading"
+								>
+									<a-select-option 
+										v-for="institution in institutions" 
+										:key="institution.id" 
+										:value="institution.id"
+									>
+										{{ institution.name }}
+									</a-select-option>
 								</a-select>
 							</div>
 						</div>
 						<div class="form-row award-row">
 							<div class="form-field award-field">
 								<label>Award Category</label>
-								<a-select v-model="selectedAward" placeholder="Select Award Category" @change="onAwardChange">
-									<a-select-option value="award-14">Award No. 14 - Financial Institution of the Year for Best Digital Payment</a-select-option>
-									<a-select-option value="award-6a">Award No. 6A - Most Popular Digital Payment Product - State Banks</a-select-option>
-									<a-select-option value="award-6b">Award No. 6B - Most Popular Digital Payment Product - Private Banks</a-select-option>
-									<a-select-option value="award-7">Award No. 7 - Best Digital Payment Innovation</a-select-option>
-									<a-select-option value="award-8">Award No. 8 - Best Digital Payment Security</a-select-option>
+								<a-select 
+									v-model="selectedAward" 
+									placeholder="Select Award Category" 
+									@change="onAwardChange"
+									:loading="awardsLoading"
+									:disabled="!selectedInstitute"
+								>
+									<a-select-option 
+										v-for="award in availableAwards" 
+										:key="award.id" 
+										:value="award.id"
+									>
+										{{ award.category }}
+									</a-select-option>
 								</a-select>
 							</div>
 						</div>
@@ -223,11 +238,13 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 								@change="filterSummary"
 							>
 								<a-select-option value="">All Categories</a-select-option>
-								<a-select-option value="award-14">Award No. 14 - Financial Institution of the Year</a-select-option>
-								<a-select-option value="award-6a">Award No. 6A - Most Popular Digital Payment Product - State Banks</a-select-option>
-								<a-select-option value="award-6b">Award No. 6B - Most Popular Digital Payment Product - Private Banks</a-select-option>
-								<a-select-option value="award-7">Award No. 7 - Best Digital Payment Innovation</a-select-option>
-								<a-select-option value="award-8">Award No. 8 - Best Digital Payment Security</a-select-option>
+								<a-select-option 
+									v-for="award in availableAwards" 
+									:key="award.id" 
+									:value="award.id"
+								>
+									{{ award.category }}
+								</a-select-option>
 							</a-select>
 						</div>
 						<div class="filter-row">
@@ -239,12 +256,13 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 								@change="filterSummary"
 							>
 								<a-select-option value="">All Institutes</a-select-option>
-								<a-select-option value="bank-ceylon">Bank of Ceylon</a-select-option>
-								<a-select-option value="commercial-bank">Commercial Bank of Ceylon PLC</a-select-option>
-								<a-select-option value="peoples-bank">People's Bank</a-select-option>
-								<a-select-option value="sampath-bank">Sampath Bank PLC</a-select-option>
-								<a-select-option value="hatton-national">Hatton National Bank PLC</a-select-option>
-								<a-select-option value="ndb-bank">NDB Bank</a-select-option>
+								<a-select-option 
+									v-for="institution in institutions" 
+									:key="institution.id" 
+									:value="institution.id"
+								>
+									{{ institution.name }}
+								</a-select-option>
 							</a-select>
 						</div>
 					</div>
@@ -334,16 +352,33 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 </template>
 
 <script>
+import apiService from '@/services/api'
 	export default ({
 		data() {
 			return {
 			// Form selections
-			judgeName: 'Mr. Asita D B Talwatta',
-			selectedInstitute: null,
-			selectedAward: null,
+			sidebarCollapsed: false,
+      currentUser: {
+        name: 'John Doe',
+        email: 'john.doe@lankapay.com',
+        profile_image: null,
+        title: null,
+        first_name: null,
+        last_name: null
+	  },
+			judgeName: '',
+			// Institutions data
+			institutions: [],
+			institutionsLoading: false,
+			// Awards data
+			availableAwards: [],
+			awardsLoading: false,
+			// Filter selections
 			categoryFilter: '',
 			instituteFilter: '',
-			
+			// Form selections
+			selectedInstitute: null,
+			selectedAward: null,
 			// Row selection state
 			selectedRowIndex: null,
 			
@@ -424,25 +459,111 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 				let filtered = this.summaryData;
 				
 				if (this.categoryFilter) {
+					// Convert ID to name if categoryFilter is an ID
+					const filterName = this.getAwardName(this.categoryFilter);
 					filtered = filtered.filter(entry => 
-						entry.award.toLowerCase().includes(this.categoryFilter.toLowerCase())
+						entry.award.toLowerCase().includes(filterName.toLowerCase())
 					);
 				}
 				
 				if (this.instituteFilter) {
+					// Convert ID to name if instituteFilter is an ID
+					const filterName = this.getInstituteName(this.instituteFilter);
 					filtered = filtered.filter(entry => 
-						entry.institute.toLowerCase().includes(this.instituteFilter.toLowerCase())
+						entry.institute.toLowerCase().includes(filterName.toLowerCase())
 					);
 				}
 				
 				return filtered;
 			}
 		},
+		
 		methods: {
+			async loadInstitutions() {
+				this.institutionsLoading = true;
+				try {
+					// Fetch institutions from judger data endpoint
+					const response = await apiService.get('/judger/institutions');
+					if (response.success && response.data) {
+						this.institutions = Array.isArray(response.data) ? response.data : [];
+					} else {
+						this.institutions = [];
+						console.error('Failed to load institutions:', response);
+					}
+				} catch (error) {
+					console.error('Error loading institutions:', error);
+					this.institutions = [];
+					this.$message.error('Failed to load institutions');
+				} finally {
+					this.institutionsLoading = false;
+				}
+			},
+			async loadAwardsForInstitution(institutionId) {
+				if (!institutionId) {
+					this.availableAwards = [];
+					return;
+				}
+				
+				this.awardsLoading = true;
+				try {
+					// Fetch awards for the selected institution
+					const response = await apiService.get('/judger/awards', { institution_id: institutionId });
+					if (response.success && response.data) {
+						this.availableAwards = Array.isArray(response.data) ? response.data : [];
+					} else {
+						this.availableAwards = [];
+						console.error('Failed to load awards:', response);
+					}
+				} catch (error) {
+					console.error('Error loading awards:', error);
+					this.availableAwards = [];
+					this.$message.error('Failed to load awards for institution');
+				} finally {
+					this.awardsLoading = false;
+				}
+			},
+			formatJudgeName(user) {
+				// Format: "Ms. Sachi Kaldera" (title + first_name + last_name)
+				const parts = [];
+				
+				// Add title if available
+				if (user.title && user.title.trim()) {
+					let title = user.title.trim();
+					// Ensure title has a period (e.g., "Ms" becomes "Ms.")
+					if (!title.endsWith('.')) {
+						title = title + '.';
+					}
+					parts.push(title);
+				}
+				
+				// Add first name if available
+				if (user.first_name && user.first_name.trim()) {
+					parts.push(user.first_name.trim());
+				}
+				
+				// Add last name if available
+				if (user.last_name && user.last_name.trim()) {
+					parts.push(user.last_name.trim());
+				}
+				
+				// If no name parts, fallback to username or default
+				if (parts.length === 0) {
+					return user.username || 'Judge';
+				}
+				
+				// Join with space
+				return parts.join(' ');
+			},
 			onInstituteChange() {
 				// Reset dependent fields when institute changes
 				this.selectedAward = null;
+				this.availableAwards = [];
 				this.resetMarks();
+				
+				// Load awards for the selected institution
+				if (this.selectedInstitute) {
+					this.loadAwardsForInstitution(this.selectedInstitute);
+				}
 			},
 			onAwardChange() {
 				// Reset marks when award changes
@@ -693,6 +814,13 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 				// Filter is handled by computed property
 			},
 			getInstituteName(value) {
+				// If value is a number (ID), find institution by ID
+				if (typeof value === 'number' || !isNaN(value)) {
+					const institution = this.institutions.find(inst => inst.id == value);
+					return institution ? institution.name : value;
+				}
+				
+				// Fallback for old string values (for backward compatibility)
 				const institutes = {
 					'bank-ceylon': 'Bank of Ceylon',
 					'commercial-bank': 'Commercial Bank of Ceylon PLC',
@@ -703,16 +831,49 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 				};
 				return institutes[value] || value;
 			},
-			getAwardName(value) {
-				const awards = {
-					'award-14': 'Award No. 14 - Financial Institution of the Year for Best Digital Payment',
-					'award-6a': 'Award No. 6A - Most Popular Digital Payment Product - State Banks',
-					'award-6b': 'Award No. 6B - Most Popular Digital Payment Product - Private Banks',
-					'award-7': 'Award No. 7 - Best Digital Payment Innovation',
-					'award-8': 'Award No. 8 - Best Digital Payment Security'
-				};
-				return awards[value] || value;
-			},
+		getAwardName(value) {
+			// If value is a number (ID), find award by ID
+			if (typeof value === 'number' || !isNaN(value)) {
+				const award = this.availableAwards.find(a => a.id == value);
+				return award ? award.category : value;
+			}
+			
+			// Fallback for old string values (for backward compatibility)
+			const awards = {
+				'award-14': 'Award No. 14 - Financial Institution of the Year for Best Digital Payment',
+				'award-6a': 'Award No. 6A - Most Popular Digital Payment Product - State Banks',
+				'award-6b': 'Award No. 6B - Most Popular Digital Payment Product - Private Banks',
+				'award-7': 'Award No. 7 - Best Digital Payment Innovation',
+				'award-8': 'Award No. 8 - Best Digital Payment Security'
+			};
+			return awards[value] || value;
+		}
+		},
+		mounted() {
+			// Set initial role based on current route
+			// userRoleStore.setRoleFromPath(this.$route.path)
+			
+			// Get current user from API service if available
+			const user = apiService.getCurrentUser()
+			if (user) {
+				this.currentUser = {
+					name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'John Doe',
+					email: user.email || 'john.doe@lankapay.com',
+					profile_image: user.profile_image || null,
+					title: user.title || null,
+					first_name: user.first_name || null,
+					last_name: user.last_name || null
+				}
+				
+				// Format and set judge name with title
+				this.judgeName = this.formatJudgeName(this.currentUser);
+			} else {
+				// Fallback if no user data
+				this.judgeName = 'Judge';
+			}
+			
+			// Load institutions
+			this.loadInstitutions();
 		}
 	})
 </script>
