@@ -138,7 +138,19 @@
 						</a-form-item>
 
 						<a-row :gutter="16">
-							<a-col :span="12">
+							<a-col :span="8">
+								<a-form-item label="Title">
+									<a-select
+										v-decorator="['title']"
+										placeholder="Select title"
+									>
+										<a-select-option value="Mr">Mr</a-select-option>
+										<a-select-option value="Mrs">Mrs</a-select-option>
+										<a-select-option value="Ms">Ms</a-select-option>
+									</a-select>
+								</a-form-item>
+							</a-col>
+							<a-col :span="8">
 								<a-form-item label="First Name">
 									<a-input
 										v-decorator="['firstName']"
@@ -146,7 +158,7 @@
 									/>
 								</a-form-item>
 							</a-col>
-							<a-col :span="12">
+							<a-col :span="8">
 								<a-form-item label="Last Name">
 									<a-input
 										v-decorator="['lastName']"
@@ -423,6 +435,7 @@
 							const userData = {
 								username: values.username,
 								email: values.email,
+								title: values.title || '',
 								first_name: values.firstName || '',
 								last_name: values.lastName || '',
 								role: values.role
@@ -593,6 +606,7 @@
 					this.form.setFieldsValue({
 						username: user.username,
 						email: user.email,
+						title: user.title || '',
 						firstName: user.first_name || '',
 						lastName: user.last_name || '',
 						role: user.role,

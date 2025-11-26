@@ -82,6 +82,24 @@ foreach ($alterStatements as $sql) {
     }
 }
 
+// Add title column to users table if it doesn't exist
+echo "\nAdding title column to users table...\n";
+try {
+    // Check if column exists
+    $checkStmt = $db->query("SHOW COLUMNS FROM `users` LIKE 'title'");
+    $columnExists = $checkStmt->fetch();
+    
+    if (!$columnExists) {
+        // Add title column after email
+        $db->exec("ALTER TABLE `users` ADD COLUMN `title` varchar(10) NULL AFTER `email`");
+        echo "✅ Title column added to users table\n";
+    } else {
+        echo "ℹ️  Title column already exists in users table\n";
+    }
+} catch (PDOException $e) {
+    echo "⚠️  Error adding title column: " . substr($e->getMessage(), 0, 100) . "\n";
+}
+
 // Insert award records
 echo "\nInserting award records...\n";
 try {

@@ -32,7 +32,7 @@ switch ($method) {
     case 'GET':
         if ($id) {
             // Get single account
-            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
+            $stmt = $db->prepare("SELECT id, username, email, title, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
             $stmt->execute([$id]);
             $account = $stmt->fetch();
             
@@ -62,7 +62,7 @@ switch ($method) {
             $total = $countStmt->fetch()['total'];
             
             // Get accounts
-            $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?");
+            $stmt = $db->prepare("SELECT id, username, email, title, first_name, last_name, role, status, profile_image, created_at FROM users WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?");
             $params[] = $limit;
             $params[] = $offset;
             $stmt->execute($params);
@@ -85,6 +85,7 @@ switch ($method) {
         $username = $input['username'] ?? '';
         $email = $input['email'] ?? '';
         $password = $input['password'] ?? '';
+        $title = $input['title'] ?? '';
         $firstName = $input['first_name'] ?? '';
         $lastName = $input['last_name'] ?? '';
         $role = $input['role'] ?? '';
@@ -125,18 +126,18 @@ switch ($method) {
             }
         }
         
-        // Insert user - include profile_image if provided
+        // Insert user - include profile_image and title (title is nullable)
         if ($profileImage) {
-            $stmt = $db->prepare("INSERT INTO users (username, email, password, first_name, last_name, role, profile_image) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$username, $email, $hashedPassword, $firstName, $lastName, $role, $profileImageUrl]);
+            $stmt = $db->prepare("INSERT INTO users (username, email, password, title, first_name, last_name, role, profile_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$username, $email, $hashedPassword, $title ?: null, $firstName, $lastName, $role, $profileImageUrl]);
         } else {
-            $stmt = $db->prepare("INSERT INTO users (username, email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$username, $email, $hashedPassword, $firstName, $lastName, $role]);
+            $stmt = $db->prepare("INSERT INTO users (username, email, password, title, first_name, last_name, role) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$username, $email, $hashedPassword, $title ?: null, $firstName, $lastName, $role]);
         }
         $userId = $db->lastInsertId();
         
         // Get created user
-        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, username, email, title, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $account = $stmt->fetch();
         
@@ -152,6 +153,7 @@ switch ($method) {
         $username = $input['username'] ?? null;
         $email = $input['email'] ?? null;
         $password = $input['password'] ?? null;
+        $title = $input['title'] ?? null;
         $firstName = $input['first_name'] ?? null;
         $lastName = $input['last_name'] ?? null;
         $role = $input['role'] ?? null;
@@ -199,6 +201,11 @@ switch ($method) {
             }
             $updates[] = "password = ?";
             $params[] = Auth::hashPassword($password);
+        }
+        
+        if ($title !== null) {
+            $updates[] = "title = ?";
+            $params[] = $title;
         }
         
         if ($firstName !== null) {
@@ -264,7 +271,7 @@ switch ($method) {
         $stmt->execute($params);
         
         // Get updated user
-        $stmt = $db->prepare("SELECT id, username, email, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, username, email, title, first_name, last_name, role, status, profile_image, created_at FROM users WHERE id = ?");
         $stmt->execute([$id]);
         $account = $stmt->fetch();
         
