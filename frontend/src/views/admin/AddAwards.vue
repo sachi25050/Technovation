@@ -57,7 +57,9 @@
 									style="width: 100%"
 									:min="0"
 									:max="100"
-									@change="updateWeightages"
+									:precision="2"
+									:step="1"
+									@change="(value) => { updateWeightages(value, 'presentation'); }"
 								/>
 							</a-form-item>
 						</a-col>
@@ -74,7 +76,9 @@
 									style="width: 100%"
 									:min="0"
 									:max="100"
-									@change="updateWeightages"
+									:precision="2"
+									:step="1"
+									@change="(value) => { updateWeightages(value, 'preliminary'); }"
 								/>
 							</a-form-item>
 						</a-col>
@@ -173,10 +177,10 @@
 											<span class="criteria-text">Presentation Weightage</span>
 										</td>
 										<td class="allocated-marks">
-											<span class="allocated-value">100%</span>
+											<span class="weightage-value">{{ formatWeightage(presentationWeightage) }}</span>
 										</td>
 										<td class="achieved-marks">
-											<span class="weightage-value">{{ formatWeightage(presentationWeightage) }}</span>
+											<span class="placeholder-dash">-</span>
 										</td>
 									</tr>
 									<!-- Preliminary Weightage Row -->
@@ -185,10 +189,10 @@
 											<span class="criteria-text">Preliminary Weightage</span>
 										</td>
 										<td class="allocated-marks">
-											<span class="allocated-value">-</span>
+											<span class="weightage-value">{{ formatWeightage(preliminaryWeightage) }}</span>
 										</td>
 										<td class="achieved-marks">
-											<span class="weightage-value">{{ formatWeightage(preliminaryWeightage) }}</span>
+											<span class="placeholder-dash">-</span>
 										</td>
 									</tr>
 								</tbody>
@@ -522,20 +526,39 @@
 				};
 				return colors[category] || 'default';
 			},
-			updateWeightages() {
+			updateWeightages(value, field) {
 				// This method is called when weightage input fields change
-				// Update the weightage values from form fields
-				const values = this.form.getFieldsValue();
-				this.presentationWeightage = values.presentationWeightage || 0;
-				this.preliminaryWeightage = values.preliminaryWeightage || 0;
+				// Update the weightage values directly from the event value
+				
+				if (field === 'presentation') {
+					// Use the value directly from the event (it's already a number)
+					if (value !== undefined && value !== null && !isNaN(value)) {
+						this.presentationWeightage = Number(value);
+					}
+				} else if (field === 'preliminary') {
+					// Use the value directly from the event (it's already a number)
+					if (value !== undefined && value !== null && !isNaN(value)) {
+						this.preliminaryWeightage = Number(value);
+					}
+				} else {
+					// Fallback: get all values from form
+					const values = this.form.getFieldsValue();
+					this.presentationWeightage = values.presentationWeightage !== undefined && values.presentationWeightage !== null ? Number(values.presentationWeightage) || 0 : 0;
+					this.preliminaryWeightage = values.preliminaryWeightage !== undefined && values.preliminaryWeightage !== null ? Number(values.preliminaryWeightage) || 0 : 0;
+				}
 			},
 			formatWeightage(value) {
-				if (value === null || value === undefined || value === '') {
-					return '0%';
-				}
-				const numValue = parseFloat(value) || 0;
+				if (value === null || value === undefined || value === '') return '0.00%';
+				
+				let numValue = parseFloat(value);
+				
+				// If value is NaN, return 0
+				if (isNaN(numValue)) return '0.00%';
+				
+				// Display the value exactly as entered with % symbol
 				return numValue.toFixed(2) + '%';
 			},
+
 			async loadRecentAwards() {
 				try {
 					const response = await apiService.getAwards({ page: 1, limit: 5 });
@@ -635,9 +658,8 @@
 							this.criteria = [{ name: '', marks: null }];
 						}
 						
-						// Update weightages
-						this.presentationWeightage = fullAward.presentation_weightage || 0;
-						this.preliminaryWeightage = fullAward.preliminary_weightage || 0;
+						// Sync weightages from form to ensure they're displayed correctly
+						this.updateWeightages();
 					});
 					
 					// Scroll to form
