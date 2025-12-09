@@ -108,7 +108,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 									</td>
 									<td class="allocated-marks">
 											<span class="allocated-value">
-										{{ selectedInstitute && selectedAward ? criterion.allocated : (index === 4 ? '100%' : '0') }}
+										{{ selectedInstitute && selectedAward ? criterion.allocated : '0' }}
 											</span>
 									</td>
 									<td class="achieved-marks">
@@ -130,7 +130,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 											<span class="total-text">Total</span>
 										</td>
 										<td class="total-allocated">
-											<span class="total-value">{{ totalAllocated }}%</span>
+											<span class="total-value">{{ totalAllocated }}</span>
 										</td>
 										<td class="total-achieved">
 											<span class="total-value">{{ totalMarks }}</span>
@@ -185,9 +185,9 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 							</tbody>
 						</table>
 						</div>
-						<div v-if="totalMarks !== 100 && selectedInstitute && selectedAward" class="modern-warning">
+						<div v-if="totalMarks !== totalAllocated && selectedInstitute && selectedAward" class="modern-warning">
 							<div class="warning-icon">⚠️</div>
-							<span class="warning-text">Total marks must equal 100%</span>
+							<span class="warning-text">Total marks must equal {{ totalAllocated }} (allocated marks)</span>
 					</div>
 						</div>
 					<div class="modern-action-buttons">
@@ -452,8 +452,9 @@ import apiService from '@/services/api'
 			canSubmit() {
 				return this.selectedInstitute && 
 					   this.selectedAward && 
-					   this.totalMarks === 100 &&
-					   this.markingCriteria.every(c => c.marks !== null && c.marks > 0);
+					   this.totalMarks === this.totalAllocated &&
+					   this.markingCriteria.every(c => c.marks !== null && c.marks >= 0) &&
+					   this.markingCriteria.length > 0;
 			},
 			filteredSummaryData() {
 				let filtered = this.summaryData;
@@ -570,55 +571,69 @@ import apiService from '@/services/api'
 				this.resetMarks();
 				// Fetch award data including weightages
 				this.fetchAwardWeightages();
+				// Fetch marking criteria for the selected award
+				this.fetchMarkingCriteria();
 			},
-			fetchAwardWeightages() {
+			async fetchAwardWeightages() {
 				if (!this.selectedAward) {
 					this.presentationWeightage = 0;
 					this.preliminaryWeightage = 0;
 					return;
 				}
 				
-				// Map award value to award ID or fetch from API
-				// For now, we'll fetch all awards and find the matching one
-				const token = localStorage.getItem('token');
-				fetch('http://localhost/backend/api/admin/awards', {
-					method: 'GET',
-					headers: {
-						'Content-Type': 'application/json',
-						'Authorization': `Bearer ${token}`
-					}
-				})
-				.then(response => response.json())
-				.then(data => {
-					if (data.success && data.data) {
-						// Find award by matching category name
-						const awardName = this.getAwardName(this.selectedAward);
-						const award = data.data.find(a => 
-							a.category && a.category.toLowerCase().includes(awardName.toLowerCase().substring(0, 20))
-						);
-						
-						if (award) {
-							this.presentationWeightage = parseFloat(award.presentation_weightage) || 0;
-							this.preliminaryWeightage = parseFloat(award.preliminary_weightage) || 0;
-							// TODO: Fetch preliminaryScore from API based on selectedInstitute and selectedAward
-							// For now, preliminaryScore remains at its default value
-						} else {
-							// Default values if not found
-							this.presentationWeightage = 10;
-							this.preliminaryWeightage = 90;
-						}
+				try {
+					// Find award from availableAwards
+					const award = this.availableAwards.find(a => a.id == this.selectedAward);
+					
+					if (award) {
+						this.presentationWeightage = parseFloat(award.presentation_weightage) || 0;
+						this.preliminaryWeightage = parseFloat(award.preliminary_weightage) || 0;
 					} else {
-						// Default values on error
+						// Default values if not found
 						this.presentationWeightage = 10;
 						this.preliminaryWeightage = 90;
 					}
-				})
-				.catch(error => {
+				} catch (error) {
 					console.error('Error fetching award weightages:', error);
 					// Default values on error
 					this.presentationWeightage = 10;
 					this.preliminaryWeightage = 90;
-				});
+				}
+			},
+			async fetchMarkingCriteria() {
+				if (!this.selectedAward) {
+					// Reset to default criteria if no award selected
+					this.markingCriteria = [
+						{ name: 'Innovation & Creativity', allocated: 20, marks: null },
+						{ name: 'Technical Excellence', allocated: 25, marks: null },
+						{ name: 'Impact & Relevance', allocated: 25, marks: null },
+						{ name: 'Presentation & Documentation', allocated: 20, marks: null },
+						{ name: 'Overall Performance', allocated: 10, marks: null }
+					];
+					return;
+				}
+				
+				try {
+					// Fetch criteria for the selected award - endpoint is /judger/criteria/{award_id}
+					const response = await apiService.get(`/judger/criteria/${this.selectedAward}`);
+					
+					if (response.success && response.data && response.data.criteria) {
+						// Map criteria from API to component format
+						this.markingCriteria = response.data.criteria.map(criterion => ({
+							id: criterion.id,
+							name: criterion.name,
+							allocated: parseInt(criterion.allocated_marks) || 0,
+							marks: null // Reset marks when loading new criteria
+						}));
+					} else {
+						console.error('Failed to load criteria:', response);
+						// Keep default criteria on error
+					}
+				} catch (error) {
+					console.error('Error loading marking criteria:', error);
+					this.$message.error('Failed to load marking criteria');
+					// Keep default criteria on error
+				}
 			},
 			updateWeightages() {
 				// This method handles dynamic weightage updates
@@ -751,7 +766,7 @@ import apiService from '@/services/api'
 			},
 			submitMarks() {
 				if (!this.canSubmit) {
-					this.$message.error('Please complete all required fields and ensure total marks equal 100%');
+					this.$message.error(`Please complete all required fields and ensure total marks equal ${this.totalAllocated}`);
 					return;
 				}
 				

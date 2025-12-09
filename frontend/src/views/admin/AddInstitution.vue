@@ -112,32 +112,50 @@
 									{{ award.category }}
 								</a-select-option>
 							</a-select>
-							
-							<!-- Display selected awards with mark input -->
-							<div v-if="selectedAwards.length > 0" class="selected-awards-container">
-								<div 
-									v-for="(award, index) in selectedAwards" 
-									:key="award.value"
-									class="award-item-row"
-								>
-									<a-tag 
-										closable 
-										@close="removeAward(index)"
-										class="award-tag"
-									>
-										{{ award.label }}
-									</a-tag>
-									<a-input-number
-										v-model="award.marks"
-										placeholder="Enter marks"
-										class="award-marks-input"
-										:min="0"
-										:max="1000"
-										size="default"
-									/>
-								</div>
-							</div>
 						</a-form-item>
+
+						<!-- Selected Awards with Marks Section (similar to criteria in Add Awards) -->
+						<div v-if="selectedAwards.length > 0" class="selected-awards-section">
+							<div class="awards-header">
+								<h4>Selected Award Categories</h4>
+								<p>Enter marks for each selected award category</p>
+							</div>
+
+							<div v-for="(award, index) in selectedAwards" :key="award.value" class="award-criterion-item">
+								<a-row :gutter="16" align="middle">
+									<a-col :span="16">
+										<div class="award-name-display">
+											<span class="award-category-text">{{ award.label }}</span>
+										</div>
+									</a-col>
+									<a-col :span="6">
+										<a-input-number
+											v-model="award.marks"
+											placeholder="Marks"
+											style="width: 100%"
+											:min="0"
+											:max="1000"
+											size="large"
+										/>
+									</a-col>
+									<a-col :span="2">
+										<a-button
+											type="danger"
+											icon="delete"
+											@click="removeAward(index)"
+										/>
+									</a-col>
+								</a-row>
+							</div>
+
+							<div class="awards-summary">
+								<a-alert
+									:message="`Total Selected Awards: ${selectedAwards.length} | Total Marks: ${totalSelectedMarks}`"
+									type="info"
+									show-icon
+								/>
+							</div>
+						</div>
 
 						<a-form-item>
 							<a-button type="primary" html-type="submit" :loading="loading" size="large">
@@ -210,16 +228,21 @@
 					<span v-else class="no-image-text">No image</span>
 				</template>
 				<template slot="awards" slot-scope="text, record">
-					<span v-if="!record.awards || !Array.isArray(record.awards) || record.awards.length === 0">
+					<div v-if="!record.awards || !Array.isArray(record.awards) || record.awards.length === 0" class="no-awards">
 						No awards
-					</span>
-					<span v-else>
-						{{ record.awards.length }} award(s): 
-						<span v-for="(award, index) in record.awards" :key="award.id || index">
-							{{ award.award_number || (award.category ? award.category.split(' - ')[0] : 'Award') }}
-							<span v-if="index < record.awards.length - 1">, </span>
-						</span>
-					</span>
+					</div>
+					<div v-else class="awards-display">
+						<div 
+							v-for="(award, index) in record.awards" 
+							:key="award.id || index"
+							class="award-item-display"
+						>
+							<span class="award-name">{{ award.category ? award.category.split(' - ')[0] : (award.award_number || 'Award') }}</span>
+							<a-tag color="blue" class="award-marks-tag">
+								{{ award.marks || 0 }} marks
+							</a-tag>
+						</div>
+					</div>
 				</template>
 				<template slot="action" slot-scope="text, record">
 					<a href="javascript:void(0);" @click="editInstitution(record)" class="action-link">
@@ -318,6 +341,11 @@
 					options[value] = award.category;
 				});
 				return options;
+			},
+			totalSelectedMarks() {
+				return this.selectedAwards.reduce((total, award) => {
+					return total + (award.marks || 0);
+				}, 0);
 			}
 		},
 		beforeDestroy() {
@@ -328,17 +356,16 @@
 		},
 		methods: {
 			/**
-			 * Get award value from award object (maps award_number to value format)
-			 * @param {Object} award - Award object with award_number
-			 * @returns {String} - Value in format like "award-14", "award-6a", etc.
+			 * Get award value from award object (uses award ID for consistency)
+			 * @param {Object} award - Award object with id
+			 * @returns {String} - Value in format like "award-14", "award-6", etc.
 			 */
 			getAwardValue(award) {
-				if (!award || !award.award_number) {
-					return `award-${award.id}`;
+				if (!award || !award.id) {
+					return null;
 				}
-				// Convert award_number to lowercase and format as "award-{number}"
-				const awardNum = award.award_number.toString().toLowerCase();
-				return `award-${awardNum}`;
+				// Always use the award's database ID for reliable mapping
+				return `award-${award.id}`;
 			},
 			/**
 			 * Find award by value (reverse lookup)
@@ -612,21 +639,8 @@
 				if (institution.awards && Array.isArray(institution.awards) && institution.awards.length > 0) {
 					// Map awards from API format to frontend format
 					this.selectedAwards = institution.awards.map(award => {
-						// Determine award value from award_number
-						let awardValue = null;
-						if (award.award_number) {
-							// Convert award_number to value format (e.g., "14" -> "award-14", "6A" -> "award-6a")
-							const awardNum = award.award_number.toString().toLowerCase();
-							awardValue = `award-${awardNum}`;
-						} else if (award.value) {
-							awardValue = award.value;
-						} else {
-							// Fallback: try to find by category
-							const foundAward = this.availableAwards.find(a => a.category === award.category);
-							if (foundAward) {
-								awardValue = this.getAwardValue(foundAward);
-							}
-						}
+						// Use award ID directly for consistent mapping
+						const awardValue = `award-${award.id}`;
 						
 						return {
 							value: awardValue,
@@ -925,107 +939,100 @@
 	color: #8c8c8c;
 	font-size: 12px;
 }
-// Selected Awards Container Styles
-.selected-awards-container {
-	margin-top: 16px;
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-}
-
-.award-item-row {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	height: 32px;
-	min-height: 32px;
-	flex-wrap: nowrap;
+// Selected Awards Section Styles (matching criteria section in Add Awards)
+.selected-awards-section {
+	margin-top: 8px;
+	margin-bottom: 24px;
 	
-	@media (max-width: 768px) {
-		flex-direction: column;
-		align-items: flex-start;
-		height: auto;
-		min-height: auto;
-	}
-}
-
-.award-tag {
-	margin: 0 !important;
-	padding: 0 12px;
-	font-size: 13px;
-	font-weight: 400;
-	background-color: #f5f5f5;
-	border: 1px solid #d9d9d9;
-	border-radius: 4px;
-	color: #595959;
-	height: 32px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	line-height: 32px;
-	max-width: 100%;
-	box-sizing: border-box;
-	flex-shrink: 0;
-	
-	::v-deep .anticon-close {
-		margin-left: 8px;
-		margin-right: 0;
-		color: #8c8c8c;
-		font-size: 12px;
-		vertical-align: middle;
+	.awards-header {
+		margin-bottom: 16px;
 		
-		&:hover {
-			color: #595959;
+		h4 {
+			margin: 0 0 4px 0;
+			font-size: 16px;
+			font-weight: 600;
+			color: #1f2937;
+		}
+		
+		p {
+			margin: 0;
+			color: #6b7280;
+			font-size: 13px;
 		}
 	}
+	
+	.awards-summary {
+		margin-top: 16px;
+	}
+}
+
+.award-criterion-item {
+	margin-bottom: 12px;
+	padding: 16px;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	background-color: #f9fafb;
+	border-left: 3px solid #3b82f6;
+	transition: all 0.2s ease;
 	
 	&:hover {
-		background-color: #e6f7ff;
-		border-color: #40a9ff;
-	}
-	
-	::v-deep span {
-		line-height: 32px;
-		vertical-align: middle;
+		border-color: #3b82f6;
+		box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
 	}
 }
 
-.award-marks-input {
-	width: 150px;
-	min-width: 120px;
-	flex-shrink: 0;
+.award-name-display {
+	padding: 8px 12px;
+	background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+	border-radius: 6px;
+	border: 1px solid #e2e8f0;
 	
-	::v-deep .ant-input-number {
-		width: 100%;
-		height: 32px;
-		border-radius: 4px;
-		border: 1px solid #d9d9d9;
-		transition: all 0.3s;
-		display: flex;
-		align-items: center;
-		
-		&:hover {
-			border-color: #40a9ff;
-		}
-		
-		&:focus,
-		&.ant-input-number-focused {
-			border-color: #40a9ff;
-			box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-		}
-		
-		.ant-input-number-input {
-			height: 30px;
-			line-height: 30px;
-			font-size: 14px;
-			padding: 0 11px;
-		}
+	.award-category-text {
+		font-size: 14px;
+		font-weight: 500;
+		color: #1e293b;
+		line-height: 1.5;
+		display: block;
+	}
+}
+
+// Awards Display in Table (matching criteria display in Add Awards)
+.awards-display {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.award-item-display {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	background: #f8fafc;
+	border-radius: 4px;
+	border-left: 3px solid #3b82f6;
+	
+	.award-name {
+		flex: 1;
+		font-size: 13px;
+		font-weight: 500;
+		color: #1e293b;
+		line-height: 1.4;
 	}
 	
-	@media (max-width: 768px) {
-		width: 100%;
-		min-width: 100%;
+	.award-marks-tag {
+		flex-shrink: 0;
+		font-size: 12px;
+		font-weight: 600;
+		margin: 0;
 	}
+}
+
+.no-awards {
+	color: #94a3b8;
+	font-size: 13px;
+	font-style: italic;
 }
 
 // Custom Image Uploader Styles

@@ -43,10 +43,18 @@ switch ($method) {
                 Response::notFound('Institution not found');
             }
             
-            // Parse awards
-            if ($institution['awards']) {
-                $awards = [];
-                foreach (explode('||', $institution['awards']) as $awardStr) {
+            // Parse awards - ensure it's always an array
+            $awards = [];
+            
+            // Check if awards data exists and is not null/empty
+            if (!empty($institution['awards']) && $institution['awards'] !== null) {
+                $awardStrings = explode('||', $institution['awards']);
+                foreach ($awardStrings as $awardStr) {
+                    // Skip empty strings
+                    if (empty(trim($awardStr))) {
+                        continue;
+                    }
+                    
                     $parts = explode(':', $awardStr);
                     if (count($parts) >= 4) {
                         $awards[] = [
@@ -65,10 +73,10 @@ switch ($method) {
                         ];
                     }
                 }
-                $institution['awards'] = $awards;
-            } else {
-                $institution['awards'] = [];
             }
+            
+            // Always set awards as an array (even if empty)
+            $institution['awards'] = $awards;
             
             Response::success('Institution retrieved', $institution);
         } else {
@@ -99,9 +107,18 @@ switch ($method) {
             
             // Parse awards for each institution
             foreach ($institutions as &$institution) {
-                if ($institution['awards']) {
-                    $awards = [];
-                    foreach (explode('||', $institution['awards']) as $awardStr) {
+                // Ensure awards is always an array
+                $awards = [];
+                
+                // Check if awards data exists and is not null/empty
+                if (!empty($institution['awards']) && $institution['awards'] !== null) {
+                    $awardStrings = explode('||', $institution['awards']);
+                    foreach ($awardStrings as $awardStr) {
+                        // Skip empty strings
+                        if (empty(trim($awardStr))) {
+                            continue;
+                        }
+                        
                         $parts = explode(':', $awardStr);
                         if (count($parts) >= 4) {
                             $awards[] = [
@@ -120,10 +137,10 @@ switch ($method) {
                             ];
                         }
                     }
-                    $institution['awards'] = $awards;
-                } else {
-                    $institution['awards'] = [];
                 }
+                
+                // Always set awards as an array (even if empty)
+                $institution['awards'] = $awards;
             }
             unset($institution); // Break reference
             
@@ -187,15 +204,6 @@ switch ($method) {
             error_log("Inserting " . count($awardCategories) . " awards for institution ID " . $institutionId);
             $insertStmt = $db->prepare("INSERT INTO institution_awards (institution_id, award_id, marks) VALUES (?, ?, ?)");
             
-            // Award mapping from frontend values to award_numbers (more reliable than hardcoded IDs)
-            $awardNumberMapping = [
-                'award-14' => '14',
-                'award-6a' => '6A',
-                'award-6b' => '6B',
-                'award-7' => '7',
-                'award-8' => '8'
-            ];
-            
             foreach ($awardCategories as $award) {
                 try {
                     // Extract award information from different formats
@@ -218,37 +226,30 @@ switch ($method) {
                         continue; // Skip empty awards
                     }
                     
-                    // Get award number from mapping
-                    $awardNumber = null;
-                    if (isset($awardNumberMapping[$awardValue])) {
-                        $awardNumber = $awardNumberMapping[$awardValue];
-                        error_log("    Found in mapping: award_number=" . $awardNumber);
-                    } else {
-                        // Try to extract award number from formats like "award-14" or "award-6b"
-                        if (preg_match('/award-(\d+[a-z]?)/i', $awardValue, $matches)) {
-                            $awardNumber = strtoupper($matches[1]);
-                            error_log("    Extracted from pattern: award_number=" . $awardNumber);
-                        }
+                    // Extract award ID from value format "award-{id}"
+                    $awardId = null;
+                    if (preg_match('/award-(\d+)/i', $awardValue, $matches)) {
+                        $awardId = (int)$matches[1];
+                        error_log("    Extracted award_id=" . $awardId . " from value");
                     }
                     
-                    // Query award by award_number to get the actual ID
-                    if ($awardNumber !== null) {
-                        $checkStmt = $db->prepare("SELECT id FROM awards WHERE award_number = ?");
-                        $checkStmt->execute([$awardNumber]);
+                    // Verify the award exists in the database
+                    if ($awardId !== null) {
+                        $checkStmt = $db->prepare("SELECT id FROM awards WHERE id = ?");
+                        $checkStmt->execute([$awardId]);
                         $awardRecord = $checkStmt->fetch();
                         
                         if ($awardRecord) {
-                            $awardId = $awardRecord['id'];
-                            error_log("    Found award in database: award_id=" . $awardId . ", award_number=" . $awardNumber . ", marks=" . $marks);
+                            error_log("    Found award in database: award_id=" . $awardId . ", marks=" . $marks);
                             
                             // Insert into institution_awards table with award_id and marks
                             $insertStmt->execute([$institutionId, $awardId, $marks]);
                             error_log("    Successfully inserted into institution_awards: institution_id=" . $institutionId . ", award_id=" . $awardId . ", marks=" . $marks);
                         } else {
-                            error_log("    ERROR: Award number '{$awardNumber}' (from '{$awardValue}') not found in database. Please run: php database/setup_awards.php");
+                            error_log("    ERROR: Award ID '{$awardId}' (from '{$awardValue}') not found in database");
                         }
                     } else {
-                        error_log("    ERROR: Could not determine award number for '{$awardValue}'");
+                        error_log("    ERROR: Could not extract award ID from '{$awardValue}'");
                     }
                 } catch (PDOException $e) {
                     // Log error but continue with other awards
@@ -279,10 +280,18 @@ switch ($method) {
             Response::error('Failed to retrieve created institution');
         }
         
-        // Parse awards
-        if ($institution['awards']) {
-            $awards = [];
-            foreach (explode('||', $institution['awards']) as $awardStr) {
+        // Parse awards - ensure it's always an array
+        $awards = [];
+        
+        // Check if awards data exists and is not null/empty
+        if (!empty($institution['awards']) && $institution['awards'] !== null) {
+            $awardStrings = explode('||', $institution['awards']);
+            foreach ($awardStrings as $awardStr) {
+                // Skip empty strings
+                if (empty(trim($awardStr))) {
+                    continue;
+                }
+                
                 $parts = explode(':', $awardStr);
                 if (count($parts) >= 4) {
                     $awards[] = [
@@ -293,10 +302,10 @@ switch ($method) {
                     ];
                 }
             }
-            $institution['awards'] = $awards;
-        } else {
-            $institution['awards'] = [];
         }
+        
+        // Always set awards as an array (even if empty)
+        $institution['awards'] = $awards;
         
         Response::success('Institution created successfully', $institution, 201);
         break;
@@ -394,15 +403,6 @@ switch ($method) {
             // Insert new awards
             $insertStmt = $db->prepare("INSERT INTO institution_awards (institution_id, award_id, marks) VALUES (?, ?, ?)");
             
-            // Award mapping from frontend values to award_numbers (more reliable than hardcoded IDs)
-            $awardNumberMapping = [
-                'award-14' => '14',
-                'award-6a' => '6A',
-                'award-6b' => '6B',
-                'award-7' => '7',
-                'award-8' => '8'
-            ];
-            
             foreach ($awardCategories as $award) {
                 try {
                     $awardValue = is_array($award) ? ($award['value'] ?? null) : $award;
@@ -421,31 +421,27 @@ switch ($method) {
                         continue;
                     }
                     
-                    // Get award number from mapping
-                    $awardNumber = null;
-                    if (isset($awardNumberMapping[$awardValue])) {
-                        $awardNumber = $awardNumberMapping[$awardValue];
-                    } else {
-                        // Try to extract award number from formats like "award-14" or "award-6b"
-                        if (preg_match('/award-(\d+[a-z]?)/i', $awardValue, $matches)) {
-                            $awardNumber = strtoupper($matches[1]);
-                        }
+                    // Extract award ID from value format "award-{id}"
+                    $awardId = null;
+                    if (preg_match('/award-(\d+)/i', $awardValue, $matches)) {
+                        $awardId = (int)$matches[1];
                     }
                     
-                    // Query award by award_number to get the actual ID
-                    if ($awardNumber !== null) {
-                        $checkStmt = $db->prepare("SELECT id FROM awards WHERE award_number = ?");
-                        $checkStmt->execute([$awardNumber]);
+                    // Verify the award exists in the database
+                    if ($awardId !== null) {
+                        $checkStmt = $db->prepare("SELECT id FROM awards WHERE id = ?");
+                        $checkStmt->execute([$awardId]);
                         $awardRecord = $checkStmt->fetch();
                         
                         if ($awardRecord) {
-                            $awardId = $awardRecord['id'];
                             // Insert into institution_awards table with award_id and marks
                             $insertStmt->execute([$id, $awardId, $marks]);
                             error_log("Updated institution_awards: institution_id={$id}, award_id={$awardId}, marks={$marks}");
                         } else {
-                            error_log("Warning: Award number '{$awardNumber}' (from '{$awardValue}') not found in database during update. Please run: php database/setup_awards.php");
+                            error_log("Warning: Award ID '{$awardId}' (from '{$awardValue}') not found in database during update");
                         }
+                    } else {
+                        error_log("Warning: Could not extract award ID from '{$awardValue}' during update");
                     }
                 } catch (PDOException $e) {
                     error_log("Warning: Failed to link award to institution during update: " . $e->getMessage());
@@ -473,10 +469,18 @@ switch ($method) {
             Response::error('Failed to retrieve updated institution');
         }
         
-        // Parse awards
-        if ($institution['awards']) {
-            $awards = [];
-            foreach (explode('||', $institution['awards']) as $awardStr) {
+        // Parse awards - ensure it's always an array
+        $awards = [];
+        
+        // Check if awards data exists and is not null/empty
+        if (!empty($institution['awards']) && $institution['awards'] !== null) {
+            $awardStrings = explode('||', $institution['awards']);
+            foreach ($awardStrings as $awardStr) {
+                // Skip empty strings
+                if (empty(trim($awardStr))) {
+                    continue;
+                }
+                
                 $parts = explode(':', $awardStr);
                 if (count($parts) >= 4) {
                     $awards[] = [
@@ -487,10 +491,10 @@ switch ($method) {
                     ];
                 }
             }
-            $institution['awards'] = $awards;
-        } else {
-            $institution['awards'] = [];
         }
+        
+        // Always set awards as an array (even if empty)
+        $institution['awards'] = $awards;
         
         Response::success('Institution updated successfully', $institution);
         break;
