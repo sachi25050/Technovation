@@ -180,6 +180,7 @@ switch ($method) {
         $description = $input['awardDescription'] ?? $input['description'] ?? null;
         $presentationWeightage = isset($input['presentationWeightage']) ? (float)$input['presentationWeightage'] : null;
         $preliminaryWeightage = isset($input['preliminaryWeightage']) ? (float)$input['preliminaryWeightage'] : null;
+        $criteria = $input['criteria'] ?? null;
         
         // Build update query
         $updates = [];
@@ -223,19 +224,78 @@ switch ($method) {
             }
         }
         
-        if (!empty($updates)) {
-            $params[] = $id;
-            $sql = "UPDATE awards SET " . implode(', ', $updates) . " WHERE id = ?";
-            $stmt = $db->prepare($sql);
-            $stmt->execute($params);
+        // Validate and prepare criteria if provided
+        $validCriteria = [];
+        if ($criteria !== null && is_array($criteria)) {
+            foreach ($criteria as $index => $criterion) {
+                if (empty($criterion['name']) || trim($criterion['name']) === '') {
+                    Response::validationError(['criteria' => "Criterion #" . ($index + 1) . " name is required"]);
+                }
+                
+                $marks = isset($criterion['allocated_marks']) ? (float)$criterion['allocated_marks'] : (isset($criterion['marks']) ? (float)$criterion['marks'] : null);
+                if ($marks === null || $marks <= 0) {
+                    Response::validationError(['criteria' => "Criterion #" . ($index + 1) . " allocated marks must be a positive number"]);
+                }
+                
+                $validCriteria[] = [
+                    'name' => trim($criterion['name']),
+                    'allocated_marks' => $marks,
+                    'description' => isset($criterion['description']) ? trim($criterion['description']) : null,
+                    'display_order' => isset($criterion['display_order']) ? (int)$criterion['display_order'] : ($index + 1)
+                ];
+            }
         }
         
-        // Get updated award
-        $stmt = $db->prepare("SELECT * FROM awards WHERE id = ?");
-        $stmt->execute([$id]);
-        $award = $stmt->fetch();
+        // Start transaction
+        $db->beginTransaction();
         
-        Response::success('Award updated successfully', $award);
+        try {
+            // Update award fields if any
+            if (!empty($updates)) {
+                $params[] = $id;
+                $sql = "UPDATE awards SET " . implode(', ', $updates) . " WHERE id = ?";
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
+            }
+            
+            // Update criteria if provided
+            if (!empty($validCriteria)) {
+                // Delete existing criteria
+                $deleteStmt = $db->prepare("DELETE FROM award_criteria WHERE award_id = ?");
+                $deleteStmt->execute([$id]);
+                
+                // Insert new criteria
+                $criteriaStmt = $db->prepare("INSERT INTO award_criteria (award_id, name, allocated_marks, description, display_order) VALUES (?, ?, ?, ?, ?)");
+                foreach ($validCriteria as $criterion) {
+                    $criteriaStmt->execute([
+                        $id,
+                        $criterion['name'],
+                        $criterion['allocated_marks'],
+                        $criterion['description'],
+                        $criterion['display_order']
+                    ]);
+                }
+            }
+            
+            // Commit transaction
+            $db->commit();
+            
+            // Get updated award with criteria
+            $stmt = $db->prepare("SELECT * FROM awards WHERE id = ?");
+            $stmt->execute([$id]);
+            $award = $stmt->fetch();
+            
+            // Get criteria
+            $criteriaStmt = $db->prepare("SELECT * FROM award_criteria WHERE award_id = ? ORDER BY display_order ASC");
+            $criteriaStmt->execute([$id]);
+            $award['criteria'] = $criteriaStmt->fetchAll();
+            
+            Response::success('Award updated successfully', $award);
+        } catch (Exception $e) {
+            // Rollback transaction on error
+            $db->rollBack();
+            Response::error('Failed to update award: ' . $e->getMessage(), null, 500);
+        }
         break;
         
     case 'DELETE':
