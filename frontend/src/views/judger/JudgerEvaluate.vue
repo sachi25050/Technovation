@@ -148,26 +148,26 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 										</span>
 									</td>
 									<td class="allocated-marks">
-										<span class="allocated-value">100%</span>
+										<span class="allocated-value">-</span>
 									</td>
 									<td class="achieved-marks">
 										<span class="weightage-value">{{ calculatePresentationScore() }}</span>
 									</td>
 								</tr>
-								<!-- Preliminary Weightage Row -->
-								<tr class="weightage-row" v-if="selectedInstitute && selectedAward">
-									<td class="criteria-name">
-										<span class="criteria-text">
-											Preliminary Volume Wise Score (Weighted <span class="weightage-label">{{ formatWeightage(preliminaryWeightage) }}</span>)
-										</span>
-									</td>
-									<td class="allocated-marks">
-										<span class="allocated-value">-</span>
-									</td>
-									<td class="achieved-marks">
-										<span class="weightage-value">{{ calculateVolumeWiseScore() }}</span>
-									</td>
-								</tr>
+							<!-- Preliminary Weightage Row -->
+							<tr class="weightage-row" v-if="selectedInstitute && selectedAward">
+								<td class="criteria-name">
+									<span class="criteria-text">
+										Preliminary Volume Wise Score (Weighted <span class="weightage-label">{{ formatWeightage(preliminaryWeightage) }}</span>)
+									</span>
+								</td>
+								<td class="allocated-marks">
+									<span class="allocated-value">-</span>
+								</td>
+								<td class="achieved-marks">
+									<span class="weightage-value">{{ institutionMarks.toFixed(2) }}</span>
+								</td>
+							</tr>
 								<!-- Aggregate Score Row -->
 								<tr class="aggregate-row" v-if="selectedInstitute && selectedAward">
 									<td class="criteria-name">
@@ -187,7 +187,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 						</div>
 						<div v-if="totalMarks !== totalAllocated && selectedInstitute && selectedAward" class="modern-warning">
 							<div class="warning-icon">⚠️</div>
-							<span class="warning-text">Total marks must equal {{ totalAllocated }} (allocated marks)</span>
+							<span class="warning-text">Maximum total marks must be 100</span>
 					</div>
 						</div>
 					<div class="modern-action-buttons">
@@ -391,6 +391,9 @@ import apiService from '@/services/api'
 			// For demonstration, using a default value - replace with actual API call
 			preliminaryScore: 0,
 			
+			// Institution marks from institution_awards table (displayed directly without calculation)
+			institutionMarks: 0,
+			
 			// Marking criteria and marks
 			markingCriteria: [
 				{ name: 'Innovation & Creativity', allocated: 20, marks: null },
@@ -574,32 +577,37 @@ import apiService from '@/services/api'
 				// Fetch marking criteria for the selected award
 				this.fetchMarkingCriteria();
 			},
-			async fetchAwardWeightages() {
-				if (!this.selectedAward) {
-					this.presentationWeightage = 0;
-					this.preliminaryWeightage = 0;
-					return;
-				}
+		async fetchAwardWeightages() {
+			if (!this.selectedAward) {
+				this.presentationWeightage = 0;
+				this.preliminaryWeightage = 0;
+				this.institutionMarks = 0;
+				return;
+			}
+			
+			try {
+				// Find award from availableAwards
+				const award = this.availableAwards.find(a => a.id == this.selectedAward);
 				
-				try {
-					// Find award from availableAwards
-					const award = this.availableAwards.find(a => a.id == this.selectedAward);
-					
-					if (award) {
-						this.presentationWeightage = parseFloat(award.presentation_weightage) || 0;
-						this.preliminaryWeightage = parseFloat(award.preliminary_weightage) || 0;
-					} else {
-						// Default values if not found
-						this.presentationWeightage = 10;
-						this.preliminaryWeightage = 90;
-					}
-				} catch (error) {
-					console.error('Error fetching award weightages:', error);
-					// Default values on error
+				if (award) {
+					this.presentationWeightage = parseFloat(award.presentation_weightage) || 0;
+					this.preliminaryWeightage = parseFloat(award.preliminary_weightage) || 0;
+					// Get institution marks directly from institution_awards table
+					this.institutionMarks = parseFloat(award.institution_marks) || 0;
+				} else {
+					// Default values if not found
 					this.presentationWeightage = 10;
 					this.preliminaryWeightage = 90;
+					this.institutionMarks = 0;
 				}
-			},
+			} catch (error) {
+				console.error('Error fetching award weightages:', error);
+				// Default values on error
+				this.presentationWeightage = 10;
+				this.preliminaryWeightage = 90;
+				this.institutionMarks = 0;
+			}
+		},
 			async fetchMarkingCriteria() {
 				if (!this.selectedAward) {
 					// Reset to default criteria if no award selected
@@ -668,18 +676,18 @@ import apiService from '@/services/api'
 				const volumeWiseScore = preliminaryScore * (preliminaryWeightage / 100);
 				return volumeWiseScore.toFixed(2);
 			},
-			calculateAggregateScore() {
-				// Calculate aggregate score: (Presentation - presentationWeightage%) + (Volume Wise - preliminaryWeightage%)
-				// Presentation Score = totalMarks × (presentationWeightage / 100)
-				const presentationScore = parseFloat(this.calculatePresentationScore()) || 0;
-				
-				// Volume Wise Score = preliminaryScore × (preliminaryWeightage / 100)
-				const volumeWiseScore = parseFloat(this.calculateVolumeWiseScore()) || 0;
-				
-				// Aggregate = Presentation Score + Volume Wise Score
-				const aggregate = presentationScore + volumeWiseScore;
-				return aggregate.toFixed(2);
-			},
+		calculateAggregateScore() {
+			// Calculate aggregate score: (Presentation - presentationWeightage%) + (Volume Wise - preliminaryWeightage%)
+			// Presentation Score = totalMarks × (presentationWeightage / 100)
+			const presentationScore = parseFloat(this.calculatePresentationScore()) || 0;
+			
+			// Volume Wise Score = institutionMarks (directly from institution_awards table)
+			const volumeWiseScore = this.institutionMarks || 0;
+			
+			// Aggregate = Presentation Score + Volume Wise Score
+			const aggregate = presentationScore + volumeWiseScore;
+			return aggregate.toFixed(2);
+		},
 			updateTotal() {
 				// This method is called automatically when marks change
 				// The total is computed reactively
@@ -757,13 +765,14 @@ import apiService from '@/services/api'
 					}
 				});
 			},
-			resetMarks() {
-				this.markingCriteria.forEach(criterion => {
-					criterion.marks = null;
-				});
-				this.presentationWeightage = 0;
-				this.preliminaryWeightage = 0;
-			},
+		resetMarks() {
+			this.markingCriteria.forEach(criterion => {
+				criterion.marks = null;
+			});
+			this.presentationWeightage = 0;
+			this.preliminaryWeightage = 0;
+			this.institutionMarks = 0;
+		},
 			submitMarks() {
 				if (!this.canSubmit) {
 					this.$message.error(`Please complete all required fields and ensure total marks equal ${this.totalAllocated}`);
