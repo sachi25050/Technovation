@@ -18,6 +18,13 @@ $input = json_decode($rawInput, true);
 if (json_last_error() !== JSON_ERROR_NONE || empty($input)) {
     $input = $_POST;
 }
+
+// Handle method override for file uploads (PHP doesn't populate $_FILES for PUT requests)
+// Check if this is a POST request with _method=PUT (used for updates with file uploads)
+if ($method === 'POST' && isset($_POST['_method']) && strtoupper($_POST['_method']) === 'PUT') {
+    $method = 'PUT';
+}
+
 $id = isset($_GET['_params'][0]) ? (int)$_GET['_params'][0] : (isset($_GET['params'][0]) ? (int)$_GET['params'][0] : null);
 
 switch ($method) {

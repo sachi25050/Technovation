@@ -10,9 +10,26 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 			<div class="content-container">
 				<!-- A. General Details Section -->
 				
-					<div class="filter-section">
-					<div class="section-header">
-						<h2>General Details</h2>
+					<div class="filter-section general-details-wrapper">
+					<div class="section-header-with-image">
+						<div class="section-header">
+							<h2>General Details</h2>
+						</div>
+						<!-- Institution Image -->
+						<div class="institution-image-container">
+							<div class="institution-image-wrapper" v-if="selectedInstitutionImage">
+								<img 
+									:src="selectedInstitutionImage" 
+									:alt="getInstituteName(selectedInstitute)"
+									class="institution-image"
+									@error="handleInstitutionImageError"
+								/>
+							</div>
+							<div class="institution-image-placeholder" v-else>
+								<a-icon type="bank" class="placeholder-icon" />
+								<span class="placeholder-text">No Image</span>
+							</div>
+						</div>
 					</div>
 					<div class="section-content">
 						<div class="form-row">
@@ -459,6 +476,14 @@ import apiService from '@/services/api'
 					   this.markingCriteria.every(c => c.marks !== null && c.marks >= 0) &&
 					   this.markingCriteria.length > 0;
 			},
+			selectedInstitutionImage() {
+				if (!this.selectedInstitute) return null;
+				const institution = this.institutions.find(inst => inst.id === this.selectedInstitute);
+				if (institution && institution.image_url) {
+					return this.normalizeImageUrl(institution.image_url);
+				}
+				return null;
+			},
 			filteredSummaryData() {
 				let filtered = this.summaryData;
 				
@@ -871,6 +896,30 @@ import apiService from '@/services/api'
 				'award-8': 'Award No. 8 - Best Digital Payment Security'
 			};
 			return awards[value] || value;
+		},
+		normalizeImageUrl(url) {
+			if (!url) return null;
+			
+			const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+			
+			// Extract the file path from various URL formats
+			let filePath = url;
+			
+			// If it's a full URL, extract the path after /uploads/
+			if (url.includes('/uploads/')) {
+				const uploadsIndex = url.indexOf('/uploads/');
+				filePath = url.substring(uploadsIndex + '/uploads/'.length);
+			} else if (url.startsWith('/')) {
+				filePath = url.substring(1);
+			}
+			
+			// Use the API uploads endpoint with path parameter
+			return `${apiBaseUrl}/uploads?path=${encodeURIComponent(filePath)}`;
+		},
+		handleInstitutionImageError(event) {
+			// Hide the broken image and show placeholder
+			event.target.style.display = 'none';
+			console.error('Failed to load institution image');
 		}
 		},
 		mounted() {
@@ -949,6 +998,80 @@ import apiService from '@/services/api'
 	border: 1px solid #e2e8f0;
 	width: 100%;
 	box-sizing: border-box;
+}
+
+// General Details Wrapper with Image
+.general-details-wrapper {
+	.section-header-with-image {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 16px;
+		margin-bottom: 16px;
+		
+		.section-header {
+			margin-bottom: 0;
+			flex: 1;
+		}
+		
+		@media (max-width: 768px) {
+			flex-direction: row;
+			align-items: flex-start;
+		}
+	}
+}
+
+// Institution Image Container - Right side of header
+.institution-image-container {
+	flex-shrink: 0;
+	width: 120px;
+	height: 85px;
+	
+	@media (max-width: 768px) {
+		width: 100px;
+		height: 70px;
+	}
+}
+
+.institution-image-wrapper {
+	width: 100%;
+	height: 100%;
+	border-radius: 8px;
+	overflow: hidden;
+	border: 2px solid #e2e8f0;
+	background: #f8fafc;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	
+	.institution-image {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		background: white;
+	}
+}
+
+.institution-image-placeholder {
+	width: 100%;
+	height: 100%;
+	border-radius: 8px;
+	border: 2px dashed #cbd5e1;
+	background: #f8fafc;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	
+	.placeholder-icon {
+		font-size: 24px;
+		color: #94a3b8;
+	}
+	
+	.placeholder-text {
+		font-size: 10px;
+		color: #94a3b8;
+		font-weight: 500;
+	}
 }
 
 .section-title {

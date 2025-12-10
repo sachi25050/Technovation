@@ -420,6 +420,9 @@ class ApiService {
     if (imageFile) {
       const formData = new FormData();
       
+      // Add _method field to indicate this is a PUT request (needed because PHP doesn't populate $_FILES for PUT)
+      formData.append('_method', 'PUT');
+      
       // Add all institution data fields
       Object.keys(institutionData).forEach(key => {
         if (key === 'awardCategories' && Array.isArray(institutionData[key])) {
@@ -433,7 +436,7 @@ class ApiService {
       // Add image file
       formData.append('instituteImage', imageFile);
       
-      // Make request with FormData
+      // Make request with FormData - use POST because PHP doesn't populate $_FILES for PUT requests
       const url = `${API_BASE_URL}/admin/institutions/${institutionId}`;
       const token = localStorage.getItem('auth_token');
       const headers = {};
@@ -444,7 +447,7 @@ class ApiService {
       // Don't set Content-Type for FormData, browser will set it with boundary
       
       const response = await fetch(url, {
-        method: 'PUT',
+        method: 'POST',
         headers: headers,
         body: formData
       });

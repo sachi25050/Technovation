@@ -51,6 +51,7 @@ $routes = [
     // Admin - Institutions
     'GET /admin/institutions' => 'admin/institutions.php',
     'POST /admin/institutions' => 'admin/institutions.php',
+    'POST /admin/institutions/{id}' => 'admin/institutions.php',  // For updates with file upload (_method=PUT)
     'PUT /admin/institutions/{id}' => 'admin/institutions.php',
     'DELETE /admin/institutions/{id}' => 'admin/institutions.php',
     'GET /admin/institutions/{id}' => 'admin/institutions.php',
