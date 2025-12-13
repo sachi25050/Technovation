@@ -133,9 +133,8 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 											v-if="selectedInstitute && selectedAward"
 											v-model="criterion.marks"
 											:min="0"
-											:max="criterion.allocated"
-											@change="updateTotal"
-												class="modern-marks-input"
+											@change="(value) => handleMarksChange(criterion, value)"
+											class="modern-marks-input"
 											placeholder="0"
 										/>
 										<span v-else class="placeholder-dash">-</span>
@@ -716,6 +715,20 @@ import apiService from '@/services/api'
 			updateTotal() {
 				// This method is called automatically when marks change
 				// The total is computed reactively
+			},
+			handleMarksChange(criterion, value) {
+				// Validate that achieved marks don't exceed allocated marks
+				if (value !== null && value > criterion.allocated) {
+					this.$message.warning({
+						content: `Achieved marks cannot exceed the allocated value of ${criterion.allocated} for "${criterion.name}". Value has been adjusted to the maximum.`,
+						duration: 4
+					});
+					// Reset to the maximum allocated value
+					this.$nextTick(() => {
+						criterion.marks = criterion.allocated;
+					});
+				}
+				this.updateTotal();
 			},
 			removeFilter() {
 				this.$confirm({
