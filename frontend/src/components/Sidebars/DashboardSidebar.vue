@@ -13,7 +13,7 @@
 		:class="['ant-layout-sider-' + sidebarColor, 'ant-layout-sider-' + sidebarTheme]"
 		theme="light"
 		:style="{ backgroundColor: 'transparent',}">
-			<div class="brand"><span class="brand-primary">Technovation</span> <span class="brand-secondary">e-Judging System</span></div>
+			<div class="brand"><span class="brand-primary">Technnovation</span> <span class="brand-secondary">e-Judging System</span></div>
 			<hr>
 
 			<!-- Role Switcher (for testing) -->

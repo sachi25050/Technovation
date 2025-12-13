@@ -1,5 +1,5 @@
 <!-- 
-	Professional Sign In page for LankaPay Technovation Awards e-Judging System
+	Professional Sign In page for LankaPay Technnovation Awards e-Judging System
 -->
 
 <template>
@@ -9,12 +9,12 @@
 			<div class="sign-in-card">
 				<!-- Logo Section -->
 				<div class="logo-section">
-					<img src="/images/image.png" alt="LankaPay Technovation Awards" class="logo" />
+					<img src="/images/image.png" alt="LankaPay Technnovation Awards" class="logo" />
 				</div>
 
 				<div class="card-header">
 					<h1 class="card-title">Sign In</h1>
-					<p class="card-subtitle">Technovation Judging System</p>
+					<p class="card-subtitle">Technnovation Judging System</p>
 				</div>
 
 				<!-- Error Message -->
@@ -100,7 +100,7 @@
 			<!-- Footer -->
 			<div class="page-footer">
 				<p class="copyright">
-					&copy; {{ currentYear }} LankaPay Technovation Awards. All rights reserved.  |HPA| ver 1.0
+					&copy; {{ currentYear }} LankaPay Technnovation Awards. All rights reserved.  |HPA| ver 1.0
 				</p>
 			</div>
 		</div>
