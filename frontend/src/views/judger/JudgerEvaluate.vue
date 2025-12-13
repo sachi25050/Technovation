@@ -766,23 +766,16 @@ import apiService from '@/services/api'
 					});
 					
 					if (response.success && response.data && response.data.exists) {
-						this.existingEvaluation = response.data.evaluation;
-						this.isEditMode = true;
-						this.editingEvaluationId = response.data.evaluation.id;
-						
-						// Show warning message
+						// Show warning message - user can use Edit/Delete buttons in the table below
 						this.$warning({
 							title: 'Evaluation Already Exists',
-							content: 'You have already evaluated this. For further changes use edit option.',
-							okText: 'Edit Existing',
-							cancelText: 'Cancel',
+							content: 'You have already evaluated this. For further changes use the Edit or Delete buttons in the Marking Sheet table below.',
+							okText: 'OK',
 							onOk: () => {
-								// Load the existing evaluation data for editing
-								this.loadExistingEvaluation(response.data.evaluation.id);
-							},
-							onCancel: () => {
-								// Reset the form
+								// Reset the form completely
+								this.selectedInstitute = null;
 								this.selectedAward = null;
+								this.availableAwards = [];
 								this.resetMarks();
 								this.isEditMode = false;
 								this.editingEvaluationId = null;
@@ -4628,6 +4621,180 @@ import apiService from '@/services/api'
 	&:focus {
 	outline: 2px solid #ABEBC6;
 	outline-offset: 2px;
+	}
+}
+
+// Enhanced Alert/Message Styles for Better Visibility
+.ant-message {
+	top: 80px !important;
+	
+	.ant-message-notice {
+		padding: 12px !important;
+	}
+	
+	.ant-message-notice-content {
+		padding: 16px 24px !important;
+		font-size: 16px !important;
+		font-weight: 600 !important;
+		border-radius: 12px !important;
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+		min-width: 300px !important;
+		
+		.ant-message-custom-content {
+			display: flex !important;
+			align-items: center !important;
+			gap: 12px !important;
+			
+			.anticon {
+				font-size: 24px !important;
+			}
+			
+			span {
+				font-size: 16px !important;
+				line-height: 1.5 !important;
+			}
+		}
+	}
+	
+	// Success message styling
+	.ant-message-success .ant-message-notice-content {
+		background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%) !important;
+		border: 2px solid #10b981 !important;
+		color: #065f46 !important;
+	}
+	
+	// Info message styling
+	.ant-message-info .ant-message-notice-content {
+		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%) !important;
+		border: 2px solid #3b82f6 !important;
+		color: #1e40af !important;
+	}
+	
+	// Warning message styling
+	.ant-message-warning .ant-message-notice-content {
+		background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+		border: 2px solid #f59e0b !important;
+		color: #92400e !important;
+	}
+	
+	// Error message styling
+	.ant-message-error .ant-message-notice-content {
+		background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%) !important;
+		border: 2px solid #ef4444 !important;
+		color: #991b1b !important;
+	}
+}
+
+// Enhanced Modal/Confirm Dialog Styles
+.ant-modal {
+	.ant-modal-content {
+		border-radius: 16px !important;
+		overflow: hidden;
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
+	}
+	
+	.ant-modal-header {
+		padding: 20px 24px !important;
+		border-bottom: 1px solid #e5e7eb !important;
+		
+		.ant-modal-title {
+			font-size: 20px !important;
+			font-weight: 700 !important;
+			color: #1f2937 !important;
+		}
+	}
+	
+	.ant-modal-body {
+		padding: 24px !important;
+		font-size: 16px !important;
+		line-height: 1.6 !important;
+		color: #4b5563 !important;
+	}
+	
+	.ant-modal-footer {
+		padding: 16px 24px !important;
+		border-top: 1px solid #e5e7eb !important;
+		
+		.ant-btn {
+			height: 40px !important;
+			padding: 0 24px !important;
+			font-size: 15px !important;
+			font-weight: 500 !important;
+			border-radius: 8px !important;
+		}
+		
+		.ant-btn-primary {
+			background: #3b82f6 !important;
+			border-color: #3b82f6 !important;
+			
+			&:hover {
+				background: #2563eb !important;
+				border-color: #2563eb !important;
+			}
+		}
+	}
+	
+	// Confirm dialog icon
+	.ant-modal-confirm-body {
+		.anticon {
+			font-size: 28px !important;
+			margin-right: 16px !important;
+		}
+		
+		.ant-modal-confirm-title {
+			font-size: 20px !important;
+			font-weight: 700 !important;
+			color: #1f2937 !important;
+		}
+		
+		.ant-modal-confirm-content {
+			font-size: 16px !important;
+			margin-top: 12px !important;
+			margin-left: 44px !important;
+			color: #4b5563 !important;
+			line-height: 1.6 !important;
+		}
+	}
+	
+	.ant-modal-confirm-btns {
+		margin-top: 24px !important;
+		
+		.ant-btn {
+			height: 42px !important;
+			padding: 0 28px !important;
+			font-size: 15px !important;
+			font-weight: 500 !important;
+			border-radius: 8px !important;
+		}
+	}
+}
+
+// Warning modal specific styling
+.ant-modal-confirm-warning,
+.ant-modal-confirm-confirm {
+	.ant-modal-confirm-body > .anticon {
+		color: #f59e0b !important;
+	}
+}
+
+// Success modal specific styling  
+.ant-modal-confirm-success {
+	.ant-modal-confirm-body > .anticon {
+		color: #10b981 !important;
+	}
+}
+
+// Error modal specific styling
+.ant-modal-confirm-error {
+	.ant-modal-confirm-body > .anticon {
+		color: #ef4444 !important;
+	}
+}
+
+// Info modal specific styling
+.ant-modal-confirm-info {
+	.ant-modal-confirm-body > .anticon {
+		color: #3b82f6 !important;
 	}
 }
 </style>

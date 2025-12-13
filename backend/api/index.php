@@ -70,6 +70,7 @@ $routes = [
     'GET /judger/evaluations' => 'judger/evaluations.php',
     'POST /judger/evaluations' => 'judger/evaluations.php',
     'PUT /judger/evaluations/{id}' => 'judger/evaluations.php',
+    'DELETE /judger/evaluations/{id}' => 'judger/evaluations.php',
     'GET /judger/evaluations/{id}' => 'judger/evaluations.php',
     'POST /judger/evaluations/{id}/submit' => 'judger/evaluations.php',
     
@@ -174,6 +175,7 @@ require_once $file;
 // - `POST /api/judger/evaluations` - Create evaluation
 // - `GET /api/judger/evaluations/{id}` - Get evaluation
 // - `PUT /api/judger/evaluations/{id}` - Update evaluation
+// - `DELETE /api/judger/evaluations/{id}` - Delete evaluation
 // - `POST /api/judger/evaluations/{id}/submit` - Submit evaluation
 
 ### Reporter (requires reporter role)
