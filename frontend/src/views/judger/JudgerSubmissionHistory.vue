@@ -17,25 +17,6 @@
 				<div class="filter-section">
 					<div class="filter-content">
 						<div class="filter-row">
-							<label>Award Category Filter</label>
-							<a-select 
-								v-model="categoryFilter" 
-								placeholder="Select Award Category"
-								class="filter-select award-filter-full"
-								@change="filterSummary"
-								:loading="awardsLoading"
-							>
-								<a-select-option value="">All Categories</a-select-option>
-								<a-select-option 
-									v-for="award in awards" 
-									:key="award.id" 
-									:value="award.id"
-								>
-									{{ award.category }}
-								</a-select-option>
-							</a-select>
-						</div>
-						<div class="filter-row">
 							<label>Institute Filter</label>
 							<a-select 
 								v-model="instituteFilter" 
@@ -54,6 +35,26 @@
 								</a-select-option>
 							</a-select>
 						</div>
+						<div class="filter-row">
+							
+							<label>Award Category Filter</label>
+							<a-select 
+								v-model="categoryFilter" 
+								placeholder="Select Award Category"
+								class="filter-select award-filter-full"
+								@change="filterSummary"
+								:loading="awardsLoading"
+							>
+								<a-select-option value="">All Categories</a-select-option>
+								<a-select-option 
+									v-for="award in awards" 
+									:key="award.id" 
+									:value="award.id"
+								>
+									{{ award.category }}
+								</a-select-option>
+							</a-select>
+						</div>
 					</div>
 				</div>
 
@@ -61,6 +62,13 @@
 				<div class="summary-section">
 					<div class="summary-header">
 						<h3>{{ judgeName }} - Submission History</h3>
+						<div class="summary-header-actions">
+							<span v-if="selectedRows.length > 0" class="selected-count">{{ selectedRows.length }} selected</span>
+							<button class="summary-delete-btn" @click="deleteSelectedRows" :disabled="selectedRows.length === 0">
+								<span class="btn-icon">🗑️</span>
+								<span class="btn-text">Delete{{ selectedRows.length > 1 ? ` (${selectedRows.length})` : '' }}</span>
+							</button>
+						</div>
 					</div>
 					<div class="modern-table-wrapper">
 						<div class="table-container">
@@ -70,18 +78,29 @@
 									<col class="col-institute" />
 									<col class="col-award" />
 									<col v-for="n in 10" :key="'col-c'+n" class="col-criteria" />
-									<col class="col-presentation" />
-									<col class="col-overall" />
+									<col class="col-pres-score" />
+									<col class="col-volume-score" />
+									<col class="col-aggregate" />
 									<col class="col-actions" />
 								</colgroup>
 								<thead class="table-header">
 									<tr>
-										<th class="th-checkbox"></th>
+										<th class="th-checkbox">
+											<input 
+												type="checkbox"
+												:checked="isAllSelected"
+												:indeterminate.prop="isIndeterminate"
+												@change="toggleSelectAll"
+												class="evaluation-checkbox select-all-checkbox"
+												aria-label="Select all rows"
+											/>
+										</th>
 										<th class="th-institute">Institute Name</th>
 										<th class="th-award">Award Category</th>
 										<th v-for="n in 10" :key="'th-c'+n" class="th-criteria">C-{{ String(n).padStart(2, '0') }}</th>
-										<th class="th-presentation">Presentation</th>
-										<th class="th-overall">Overall</th>
+										<th class="th-pres-score">Presentation</th>
+										<th class="th-volume-score">Preliminary</th>
+										<th class="th-aggregate">Aggregate</th>
 										<th class="th-actions">Actions</th>
 									</tr>
 								</thead>
@@ -89,18 +108,18 @@
 									<tr 
 										v-for="(entry, index) in filteredSummaryData" 
 										:key="index"
-										:class="{ 'selected-row': selectedRowIndex === index }"
+										:class="{ 'selected-row': isRowSelected(index) }"
 										class="evaluation-row"
 										:tabindex="0"
-										:aria-selected="selectedRowIndex === index"
-										@click="selectRow(index)"
-										@keydown.space.prevent="selectRow(index)"
-										@keydown.enter.prevent="selectRow(index)">
+										:aria-selected="isRowSelected(index)"
+										@click="toggleRowSelection(index, $event)"
+										@keydown.space.prevent="toggleRowSelection(index, $event)"
+										@keydown.enter.prevent="toggleRowSelection(index, $event)">
 										<td class="td-checkbox">
 											<input 
 												type="checkbox"
-												:checked="selectedRowIndex === index"
-												@click.stop="selectRow(index)"
+												:checked="isRowSelected(index)"
+												@click.stop="toggleRowSelection(index, $event)"
 												@change="handleCheckboxChange(index)"
 												class="evaluation-checkbox"
 												:aria-label="`Select ${entry.institute} for evaluation`"
@@ -123,13 +142,11 @@
 										<td class="td-criteria">{{ entry.c8 || '-' }}</td>
 										<td class="td-criteria">{{ entry.c9 || '-' }}</td>
 										<td class="td-criteria">{{ entry.c10 || '-' }}</td>
-										<td class="td-presentation">{{ entry.presentation }}</td>
-										<td class="td-overall">
-											<div class="overall-score-container" :data-score="getScoreRange(entry.overall)">
-												<span class="overall-score-value">{{ entry.overall }}</span>
-												<div class="tiny-progress-bar">
-													<div class="progress-fill" :style="{ width: (entry.overall / 100 * 100) + '%' }"></div>
-												</div>
+										<td class="td-pres-score">{{ entry.presentationScore || '-' }}</td>
+										<td class="td-volume-score">{{ entry.volumeWiseScore || '-' }}</td>
+										<td class="td-aggregate">
+											<div class="aggregate-score-container" :data-score="getScoreRange(entry.aggregatedScore || 0)">
+												<span class="aggregate-score-value">{{ entry.aggregatedScore || '-' }}</span>
 											</div>
 										</td>
 										<td class="td-actions">
@@ -138,6 +155,8 @@
 												size="small" 
 												@click.stop="viewDetails(entry)"
 												class="action-btn view-btn"
+												:disabled="selectedRows.length > 1"
+												:title="selectedRows.length > 1 ? 'Deselect other rows to view' : 'View details'"
 											>
 												View
 											</a-button>
@@ -146,6 +165,8 @@
 												size="small" 
 												@click.stop="editSubmission(entry)"
 												class="action-btn edit-btn"
+												:disabled="selectedRows.length > 1"
+												:title="selectedRows.length > 1 ? 'Deselect other rows to edit' : 'Edit submission'"
 											>
 												Edit
 											</a-button>
@@ -170,7 +191,7 @@
 					v-model:visible="viewModalVisible"
 					title="Submission Details"
 					:footer="null"
-					width="800px"
+					width="900px"
 					class="details-modal"
 				>
 					<div v-if="selectedSubmission" class="submission-details">
@@ -187,14 +208,15 @@
 								</div>
 								<div class="detail-item">
 									<label>Submitted Date:</label>
-									<span>{{ selectedSubmission.submittedDate || '2024-01-15' }}</span>
+									<span>{{ formatDate(selectedSubmission.submittedDate) }}</span>
 								</div>
 							</div>
 						</div>
 
 						<div class="detail-section">
-							<h4>Evaluation Scores</h4>
-							<div class="scores-table">
+							<h4>Criteria Marks</h4>
+							<div v-if="criteriaLoading" class="loading-text">Loading criteria...</div>
+							<div v-else class="scores-table">
 								<table>
 									<thead>
 										<tr>
@@ -204,38 +226,31 @@
 										</tr>
 									</thead>
 									<tbody>
-										<tr>
-											<td>Innovation & Creativity</td>
-											<td>20%</td>
-											<td>{{ selectedSubmission.c1 }}%</td>
-										</tr>
-										<tr>
-											<td>Technical Excellence</td>
-											<td>25%</td>
-											<td>{{ selectedSubmission.c2 }}%</td>
-										</tr>
-										<tr>
-											<td>Impact & Relevance</td>
-											<td>25%</td>
-											<td>{{ selectedSubmission.c3 }}%</td>
-										</tr>
-										<tr>
-											<td>Presentation & Documentation</td>
-											<td>20%</td>
-											<td>{{ selectedSubmission.c4 }}%</td>
-										</tr>
-										<tr>
-											<td>Overall Performance</td>
-											<td>10%</td>
-											<td>{{ selectedSubmission.c5 }}%</td>
-										</tr>
-										<tr class="total-row">
-											<td><strong>Total</strong></td>
-											<td><strong>100%</strong></td>
-											<td><strong>{{ selectedSubmission.overall }}%</strong></td>
+										<tr v-for="(criterion, index) in getCriteriaList()" :key="index">
+											<td>{{ criterion.name }}</td>
+											<td>{{ criterion.allocated || '-' }}</td>
+											<td>{{ criterion.marks !== null && criterion.marks !== '-' ? criterion.marks : '-' }}</td>
 										</tr>
 									</tbody>
 								</table>
+							</div>
+						</div>
+
+						<div class="detail-section">
+							<h4>Score Summary</h4>
+							<div class="score-summary-grid">
+								<div class="score-item">
+									<label>Presentation Score:</label>
+									<span class="score-value presentation">{{ selectedSubmission.presentationScore || '-' }}</span>
+								</div>
+								<div class="score-item">
+									<label>Preliminary Score:</label>
+									<span class="score-value preliminary">{{ selectedSubmission.volumeWiseScore || '-' }}</span>
+								</div>
+								<div class="score-item">
+									<label>Aggregated Score:</label>
+									<span class="score-value aggregate">{{ selectedSubmission.aggregatedScore || '-' }}</span>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -256,13 +271,19 @@ export default {
 			instituteFilter: '',
 			viewModalVisible: false,
 			selectedSubmission: null,
-			selectedRowIndex: null,
+			
+			// Row selection state - supports multiple selection
+			selectedRows: [],
 			
 			// Institutions and Awards data from API
 			institutions: [],
 			institutionsLoading: false,
 			awards: [],
 			awardsLoading: false,
+			
+			// Criteria for the selected submission
+			selectedCriteria: [],
+			criteriaLoading: false,
 			
 			// Current user info
 			currentUser: {
@@ -325,6 +346,16 @@ export default {
 			}
 			
 			return parts.join(' ');
+		},
+		// Check if all visible rows are selected
+		isAllSelected() {
+			return this.filteredSummaryData.length > 0 && 
+			       this.selectedRows.length === this.filteredSummaryData.length;
+		},
+		// Check if some but not all rows are selected
+		isIndeterminate() {
+			return this.selectedRows.length > 0 && 
+			       this.selectedRows.length < this.filteredSummaryData.length;
 		}
 	},
 	methods: {
@@ -386,8 +417,9 @@ export default {
 						c8: evaluation.criteria_8_marks || null,
 						c9: evaluation.criteria_9_marks || null,
 						c10: evaluation.criteria_10_marks || null,
-						presentation: evaluation.total_achieved_marks || evaluation.total_marks || 0,
-						overall: evaluation.aggregated_score || evaluation.total_marks || 0,
+						presentationScore: evaluation.presentation_score || 0,
+						volumeWiseScore: evaluation.preliminary_score || 0,
+						aggregatedScore: evaluation.aggregated_score || 0,
 						submittedDate: evaluation.created_at || evaluation.submitted_at
 					}));
 				}
@@ -410,21 +442,38 @@ export default {
 			}
 			return id;
 		},
-		selectRow(index) {
-			// Toggle selection - if clicking the same row, deselect it
-			if (this.selectedRowIndex === index) {
-				this.selectedRowIndex = null;
+		// Check if a specific row is selected
+		isRowSelected(index) {
+			return this.selectedRows.includes(index);
+		},
+		// Toggle row selection (supports multi-select)
+		toggleRowSelection(index, event) {
+			const selectedIndex = this.selectedRows.indexOf(index);
+			if (selectedIndex > -1) {
+				// Row is selected, deselect it
+				this.selectedRows.splice(selectedIndex, 1);
 			} else {
-				this.selectedRowIndex = index;
+				// Row is not selected, add it
+				this.selectedRows.push(index);
 			}
 		},
+		// Handle checkbox change
 		handleCheckboxChange(index) {
-			// Sync checkbox state with row selection
-			if (this.selectedRowIndex === index) {
-				this.selectedRowIndex = null;
+			this.toggleRowSelection(index);
+		},
+		// Toggle select all rows
+		toggleSelectAll() {
+			if (this.isAllSelected) {
+				// Deselect all
+				this.selectedRows = [];
 			} else {
-				this.selectedRowIndex = index;
+				// Select all visible rows
+				this.selectedRows = this.filteredSummaryData.map((_, index) => index);
 			}
+		},
+		// Clear all selections
+		clearSelection() {
+			this.selectedRows = [];
 		},
 		getScoreRange(score) {
 			// Determine score range for color coding
@@ -434,9 +483,88 @@ export default {
 			if (score >= 60) return '60-69';
 			return '0-59';
 		},
-		viewDetails(submission) {
+		async viewDetails(submission) {
 			this.selectedSubmission = submission;
+			this.selectedCriteria = [];
 			this.viewModalVisible = true;
+			
+			// Fetch criteria names for this award
+			if (submission.award_id) {
+				await this.loadCriteriaForAward(submission.award_id);
+			}
+		},
+		async loadCriteriaForAward(awardId) {
+			this.criteriaLoading = true;
+			try {
+				const response = await apiService.get(`/judger/criteria/${awardId}`);
+				if (response.success && response.data && response.data.criteria) {
+					this.selectedCriteria = response.data.criteria;
+				} else {
+					this.selectedCriteria = [];
+				}
+			} catch (error) {
+				console.error('Error loading criteria:', error);
+				this.selectedCriteria = [];
+			} finally {
+				this.criteriaLoading = false;
+			}
+		},
+		formatDate(dateString) {
+			if (!dateString) return '-';
+			try {
+				const date = new Date(dateString);
+				return date.toLocaleString('en-US', {
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit'
+				});
+			} catch (e) {
+				return dateString;
+			}
+		},
+		getCriteriaList() {
+			if (!this.selectedSubmission) return [];
+			
+			// Build criteria list from c1-c10 values
+			const criteriaMarks = [
+				this.selectedSubmission.c1,
+				this.selectedSubmission.c2,
+				this.selectedSubmission.c3,
+				this.selectedSubmission.c4,
+				this.selectedSubmission.c5,
+				this.selectedSubmission.c6,
+				this.selectedSubmission.c7,
+				this.selectedSubmission.c8,
+				this.selectedSubmission.c9,
+				this.selectedSubmission.c10
+			];
+			
+			// If we have actual criteria names from API, use them
+			if (this.selectedCriteria && this.selectedCriteria.length > 0) {
+				return this.selectedCriteria.map((criterion, index) => ({
+					name: criterion.name || `Criteria ${String(index + 1).padStart(2, '0')}`,
+					allocated: criterion.allocated_marks || 0,
+					marks: criteriaMarks[index] !== null && criteriaMarks[index] !== undefined 
+						? criteriaMarks[index] 
+						: '-'
+				}));
+			}
+			
+			// Fallback: Only include criteria that have values (not null)
+			const criteria = [];
+			criteriaMarks.forEach((marks, index) => {
+				if (marks !== null && marks !== undefined) {
+					criteria.push({
+						name: `Criteria ${String(index + 1).padStart(2, '0')}`,
+						allocated: 0,
+						marks: marks
+					});
+				}
+			});
+			
+			return criteria;
 		},
 		editSubmission(submission) {
 			this.$confirm({
@@ -485,7 +613,7 @@ export default {
 							this.summaryData.splice(index, 1);
 						}
 						
-						this.selectedRowIndex = null;
+						this.clearSelection();
 						this.$message.success('Submission deleted successfully');
 					} catch (error) {
 						console.error('Error deleting submission:', error);
@@ -494,8 +622,86 @@ export default {
 				}
 			});
 		},
+		async deleteSelectedRows() {
+			if (this.selectedRows.length === 0) {
+				this.$message.warning('Please select at least one row to delete');
+				return;
+			}
+			
+			// Get the entries to delete (sorted in descending order for safe removal)
+			const selectedIndices = [...this.selectedRows].sort((a, b) => b - a);
+			const entriesToDelete = selectedIndices.map(index => this.filteredSummaryData[index]);
+			
+			const deleteCount = entriesToDelete.length;
+			const confirmMessage = deleteCount === 1 
+				? `Are you sure you want to delete the submission for ${entriesToDelete[0].institute} - ${entriesToDelete[0].award}?`
+				: `Are you sure you want to delete ${deleteCount} submissions? This action cannot be undone.`;
+			
+			this.$confirm({
+				title: deleteCount === 1 ? 'Delete Submission' : `Delete ${deleteCount} Submissions`,
+				content: confirmMessage,
+				okText: 'Yes, Delete',
+				okType: 'danger',
+				cancelText: 'Cancel',
+				onOk: async () => {
+					try {
+						let successCount = 0;
+						let failCount = 0;
+						
+						// Delete each entry
+						for (const entry of entriesToDelete) {
+							try {
+								// If entry has an ID, delete from API
+								if (entry.id) {
+									const response = await apiService.delete(`/judger/evaluations/${entry.id}`);
+									
+									if (!response.success) {
+										failCount++;
+										continue;
+									}
+								}
+								
+								// Remove from local summaryData
+								const actualIndex = this.summaryData.findIndex(
+									item => (item.id && item.id === entry.id) || 
+									(item.institute === entry.institute && item.award === entry.award)
+								);
+								if (actualIndex !== -1) {
+									this.summaryData.splice(actualIndex, 1);
+									successCount++;
+								}
+							} catch (error) {
+								console.error('Error deleting entry:', error);
+								failCount++;
+							}
+						}
+						
+						// Clear selection
+						this.clearSelection();
+						
+						// Show result message
+						if (failCount === 0) {
+							this.$message.success(
+								successCount === 1 
+									? 'Submission deleted successfully' 
+									: `${successCount} submissions deleted successfully`
+							);
+						} else if (successCount > 0) {
+							this.$message.warning(`${successCount} deleted, ${failCount} failed`);
+						} else {
+							this.$message.error('Failed to delete submissions');
+						}
+					} catch (error) {
+						console.error('Error deleting submissions:', error);
+						this.$message.error('Failed to delete submissions. Please try again.');
+					}
+				}
+			});
+		},
 		filterSummary() {
 			// Filter is handled by computed property
+			// Clear selections when filters change to avoid index mismatches
+			this.clearSelection();
 		}
 	},
 	mounted() {
@@ -694,6 +900,9 @@ export default {
 }
 
 .summary-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
 	margin-bottom: 12px;
 	
 	@media (min-width: 768px) {
@@ -713,6 +922,61 @@ export default {
 		@media (min-width: 768px) {
 			font-size: 16px;
 		}
+	}
+}
+
+// Summary Header Actions
+.summary-header-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+// Selected count indicator
+.selected-count {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 10px;
+	background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+	border: 1px solid #93c5fd;
+	border-radius: 12px;
+	color: #1e40af;
+	font-size: 12px;
+	font-weight: 600;
+	margin-right: 4px;
+}
+
+// Select all checkbox styling
+.select-all-checkbox {
+	cursor: pointer;
+}
+
+.summary-delete-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 12px;
+	background: #fee2e2;
+	border: 1px solid #fecaca;
+	border-radius: 4px;
+	color: #991b1b;
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	
+	&:hover:not(:disabled) {
+		background: #fecaca;
+		border-color: #fca5a5;
+	}
+	
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	
+	.btn-icon {
+		font-size: 12px;
 	}
 }
 
@@ -756,7 +1020,7 @@ export default {
 // Modern Evaluation Table - Fixed Layout for Alignment
 .modern-evaluation-table {
 	width: 100%;
-	min-width: 1400px; // Enough for 10 criteria columns + other columns
+	min-width: 1500px; // Enough for 10 criteria columns + score columns + actions
 	border-collapse: collapse;
 	border-spacing: 0;
 	background: white;
@@ -765,13 +1029,14 @@ export default {
 }
 
 // Colgroup - Define fixed column widths
-.col-checkbox { width: 40px; }
-.col-institute { width: 140px; }
-.col-award { width: 160px; }
-.col-criteria { width: 50px; }
-.col-presentation { width: 75px; }
-.col-overall { width: 65px; }
-.col-actions { width: 150px; }
+.col-checkbox { width: 35px; }
+.col-institute { width: 120px; }
+.col-award { width: 140px; }
+.col-criteria { width: 45px; }
+.col-pres-score { width: 70px; }
+.col-volume-score { width: 70px; }
+.col-aggregate { width: 65px; }
+.col-actions { width: 140px; }
 
 // Table Header - Modern Gradient with fixed alignment
 .table-header {
@@ -788,13 +1053,14 @@ export default {
 .th-institute,
 .th-award,
 .th-criteria,
-.th-presentation,
-.th-overall,
+.th-pres-score,
+.th-volume-score,
+.th-aggregate,
 .th-actions {
-	padding: 10px 4px;
+	padding: 8px 4px;
 	text-align: center;
 	font-weight: 700;
-	font-size: 12px;
+	font-size: 11px;
 	color: #1E293B;
 	letter-spacing: 0.02em;
 	border: none;
@@ -803,11 +1069,12 @@ export default {
 }
 
 .th-checkbox { text-align: center; }
-.th-institute { text-align: left; padding-left: 12px; }
-.th-award { text-align: left; padding-left: 8px; }
-.th-criteria { text-align: center; font-size: 11px; }
-.th-presentation { text-align: center; font-size: 11px; }
-.th-overall { text-align: center; }
+.th-institute { text-align: left; padding-left: 8px; }
+.th-award { text-align: left; padding-left: 6px; }
+.th-criteria { text-align: center; font-size: 10px; }
+.th-pres-score { text-align: center; font-size: 10px; }
+.th-volume-score { text-align: center; font-size: 10px; }
+.th-aggregate { text-align: center; font-size: 10px; }
 .th-actions { text-align: center; }
 
 // Table Body
@@ -841,7 +1108,7 @@ export default {
 			font-weight: 600;
 		}
 		
-		.td-criteria, .td-presentation, .td-overall {
+		.td-criteria, .td-pres-score, .td-volume-score, .td-aggregate {
 			color: #1E40AF;
 			font-weight: 700;
 		}
@@ -862,27 +1129,27 @@ export default {
 .td-institute,
 .td-award,
 .td-criteria,
-.td-presentation,
-.td-overall,
+.td-pres-score,
+.td-volume-score,
+.td-aggregate,
 .td-actions {
-	padding: 8px 4px;
+	padding: 6px 4px;
 	border: none;
 	vertical-align: middle;
-	font-size: 13px;
+	font-size: 12px;
 }
 
 .td-checkbox {
 	text-align: center;
-	padding: 8px 4px;
 }
 
 .td-institute {
 	text-align: left;
-	padding-left: 12px;
+	padding-left: 8px;
 	
 	.institute-name {
 		font-weight: 600;
-		font-size: 13px;
+		font-size: 12px;
 		color: #1E293B;
 		white-space: nowrap;
 		overflow: hidden;
@@ -893,11 +1160,11 @@ export default {
 
 .td-award {
 	text-align: left;
-	padding-left: 8px;
+	padding-left: 6px;
 	
 	.award-text {
 		font-weight: 500;
-		font-size: 12px;
+		font-size: 11px;
 		color: #475569;
 		line-height: 1.3;
 		white-space: nowrap;
@@ -910,27 +1177,46 @@ export default {
 .td-criteria {
 	text-align: center;
 	font-weight: 600;
-	font-size: 13px;
+	font-size: 12px;
 	color: #1E293B;
 }
 
-.td-presentation {
+.td-pres-score {
 	text-align: center;
 	font-weight: 600;
-	font-size: 13px;
-	color: #1E293B;
+	font-size: 12px;
+	color: #059669;
 }
 
-.td-overall {
+.td-volume-score {
+	text-align: center;
+	font-weight: 600;
+	font-size: 12px;
+	color: #7c3aed;
+}
+
+.td-aggregate {
 	text-align: center;
 	font-weight: 700;
-	font-size: 13px;
+	font-size: 12px;
+	color: #2563EB;
+}
+
+.aggregate-score-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.aggregate-score-value {
+	font-weight: 700;
+	font-size: 12px;
 	color: #2563EB;
 }
 
 .td-actions {
 	text-align: center;
-	padding: 6px 4px;
+	padding: 4px 2px;
 	white-space: nowrap;
 }
 
@@ -971,6 +1257,17 @@ export default {
 		&:hover {
 			background: #DC2626;
 			border-color: #DC2626;
+		}
+	}
+	
+	&:disabled,
+	&[disabled] {
+		opacity: 0.4;
+		cursor: not-allowed;
+		pointer-events: none;
+		
+		&:hover {
+			opacity: 0.4;
 		}
 	}
 }
@@ -1152,6 +1449,13 @@ export default {
 			}
 		}
 		
+		.loading-text {
+			padding: 20px;
+			text-align: center;
+			color: #64748B;
+			font-style: italic;
+		}
+		
 		.scores-table {
 			table {
 				width: 100%;
@@ -1171,12 +1475,66 @@ export default {
 				color: #374151;
 			}
 			
+			td:nth-child(2),
+			td:nth-child(3),
+			th:nth-child(2),
+			th:nth-child(3) {
+				text-align: center;
+				width: 100px;
+			}
+			
 			.total-row {
 				background: #F1F5F9;
 				font-weight: 700;
 				
 				td {
 					border-top: 2px solid #CBD5E1;
+				}
+			}
+		}
+		
+		.score-summary-grid {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 16px;
+			margin-top: 12px;
+			
+			@media (max-width: 600px) {
+				grid-template-columns: 1fr;
+			}
+		}
+		
+		.score-item {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			padding: 16px;
+			background: #F8FAFC;
+			border-radius: 8px;
+			border: 1px solid #E2E8F0;
+			
+			label {
+				font-weight: 600;
+				color: #64748B;
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+			
+			.score-value {
+				font-size: 24px;
+				font-weight: 700;
+				
+				&.presentation {
+					color: #059669;
+				}
+				
+				&.preliminary {
+					color: #7c3aed;
+				}
+				
+				&.aggregate {
+					color: #2563EB;
 				}
 			}
 		}

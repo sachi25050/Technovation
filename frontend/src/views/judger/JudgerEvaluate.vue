@@ -296,11 +296,12 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 					<div class="summary-header">
 						<h6>{{ judgeName }} - Marking Sheet</h6>
 						<div class="summary-header-actions">
-							<button class="summary-delete-btn" @click="deleteSelectedRow" :disabled="selectedRowIndex === null">
+							<span v-if="selectedRows.length > 0" class="selected-count">{{ selectedRows.length }} selected</span>
+							<button class="summary-delete-btn" @click="deleteSelectedRows" :disabled="selectedRows.length === 0">
 								<span class="btn-icon">🗑️</span>
-								<span class="btn-text">Delete</span>
+								<span class="btn-text">Delete{{ selectedRows.length > 1 ? ` (${selectedRows.length})` : '' }}</span>
 							</button>
-							<button class="summary-edit-btn" @click="editSelectedRow" :disabled="selectedRowIndex === null">
+							<button class="summary-edit-btn" @click="editSelectedRow" :disabled="selectedRows.length !== 1">
 								<span class="btn-text">Edit</span>
 							</button>
 						</div>
@@ -308,63 +309,83 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 					<div class="modern-table-wrapper">
 						<div class="table-container">
 							<table class="modern-evaluation-table">
+								<colgroup>
+									<col class="col-checkbox" />
+									<col class="col-institute" />
+									<col class="col-award" />
+									<col v-for="n in 10" :key="'col-c'+n" class="col-criteria" />
+									<col class="col-pres-score" />
+									<col class="col-volume-score" />
+									<col class="col-aggregate" />
+								</colgroup>
 								<thead class="table-header">
 									<tr>
-										<th class="checkbox-column"></th>
-										<th class="institute-column">Institute Name</th>
-										<th class="award-column">Award Category</th>
-										<th class="criteria-column">C-01</th>
-										<th class="criteria-column">C-02</th>
-										<th class="criteria-column">C-03</th>
-										<th class="criteria-column">C-04</th>
-										<th class="criteria-column">C-05</th>
-										<th class="presentation-column">Presentation</th>
-								</tr>
-							</thead>
+										<th class="th-checkbox">
+											<input 
+												type="checkbox"
+												:checked="isAllSelected"
+												:indeterminate.prop="isIndeterminate"
+												@change="toggleSelectAll"
+												class="evaluation-checkbox select-all-checkbox"
+												aria-label="Select all rows"
+											/>
+										</th>
+										<th class="th-institute">Institute Name</th>
+										<th class="th-award">Award Category</th>
+										<th v-for="n in 10" :key="'th-c'+n" class="th-criteria">C-{{ String(n).padStart(2, '0') }}</th>
+										<th class="th-pres-score">Presentation</th>
+										<th class="th-volume-score">Preliminary</th>
+										<th class="th-aggregate">Aggregate</th>
+									</tr>
+								</thead>
 								<tbody class="table-body">
 									<tr 
 										v-for="(entry, index) in filteredSummaryData" 
 										:key="index"
-										:class="{ 'selected-row': selectedRowIndex === index }"
+										:class="{ 'selected-row': isRowSelected(index) }"
 										class="evaluation-row"
 										:tabindex="0"
-										:aria-selected="selectedRowIndex === index"
-										@click="selectRow(index)"
-										@keydown.space.prevent="selectRow(index)"
-										@keydown.enter.prevent="selectRow(index)">
-										<td class="checkbox-cell">
+										:aria-selected="isRowSelected(index)"
+										@click="toggleRowSelection(index, $event)"
+										@keydown.space.prevent="toggleRowSelection(index, $event)"
+										@keydown.enter.prevent="toggleRowSelection(index, $event)">
+										<td class="td-checkbox">
 											<input 
 												type="checkbox"
-												:checked="selectedRowIndex === index"
-												@click.stop="selectRow(index)"
+												:checked="isRowSelected(index)"
+												@click.stop="toggleRowSelection(index, $event)"
 												@change="handleCheckboxChange(index)"
 												class="evaluation-checkbox"
 												:aria-label="`Select ${entry.institute} for evaluation`"
 												:aria-describedby="`row-${index}-description`"
 											/>
 										</td>
-										<td class="institute-cell" :id="`row-${index}-description`">
+										<td class="td-institute" :id="`row-${index}-description`">
 											<span class="institute-name">{{ entry.institute }}</span>
 										</td>
-										<td class="award-cell">
+										<td class="td-award">
 											<span class="award-text">{{ entry.award }}</span>
 										</td>
-										<td class="criteria-cell">{{ entry.c1 }}</td>
-										<td class="criteria-cell">{{ entry.c2 }}</td>
-										<td class="criteria-cell">{{ entry.c3 }}</td>
-										<td class="criteria-cell">{{ entry.c4 }}</td>
-										<td class="criteria-cell">{{ entry.c5 }}</td>
-										<td class="presentation-cell">
-											<div class="presentation-score-container" :data-score="getScoreRange(entry.presentation)">
-												<span class="presentation-score-value">{{ entry.presentation }}</span>
-												<div class="presentation-progress-bar">
-													<div class="progress-fill" :style="{ width: (entry.presentation / 100 * 100) + '%' }"></div>
-												</div>
+										<td class="td-criteria">{{ entry.c1 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c2 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c3 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c4 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c5 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c6 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c7 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c8 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c9 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c10 || '-' }}</td>
+										<td class="td-pres-score">{{ entry.presentationScore || '-' }}</td>
+										<td class="td-volume-score">{{ entry.volumeWiseScore || '-' }}</td>
+										<td class="td-aggregate">
+											<div class="aggregate-score-container" :data-score="getScoreRange(entry.aggregatedScore || 0)">
+												<span class="aggregate-score-value">{{ entry.aggregatedScore || '-' }}</span>
 											</div>
 										</td>
-								</tr>
-							</tbody>
-						</table>
+									</tr>
+								</tbody>
+							</table>
 						</div>
 					</div>
 				</div>
@@ -401,8 +422,8 @@ import apiService from '@/services/api'
 			// Form selections
 			selectedInstitute: null,
 			selectedAward: null,
-			// Row selection state
-			selectedRowIndex: null,
+			// Row selection state - supports multiple selection
+			selectedRows: [],
 			
 			// Edit mode tracking
 			isEditMode: false,
@@ -430,42 +451,8 @@ import apiService from '@/services/api'
 				{ name: 'Overall Performance', allocated: 10, marks: null }
 			],
 				
-				// Summary data matching the image
-				summaryData: [
-					{
-						institute: 'Bank of Ceylon',
-						award: 'Award No. 14 - Financial Institution of the Year for Best Digital Pay...',
-						c1: 10,
-						c2: 10,
-						c3: 10,
-						c4: 10,
-						c5: 10,
-						presentation: 100,
-						overall: 100
-					},
-					{
-						institute: 'Commercial Bank of Ceylon PLC',
-						award: 'Award No. 14 - Financial Institution of the Year for Best Digital Pa...',
-						c1: 10,
-						c2: 10,
-						c3: 10,
-						c4: 10,
-						c5: 10,
-						presentation: 50,
-						overall: 50
-					},
-					{
-						institute: 'Bank of Ceylon',
-						award: 'Award No. 6A - Most Popular Digital Payment Product - State Banks',
-						c1: 15,
-						c2: 20,
-						c3: 10,
-						c4: 15,
-						c5: 5,
-						presentation: 85,
-						overall: 8.5
-					}
-				]
+				// Summary data - loaded from API
+				summaryData: []
 			}
 		},
 		computed: {
@@ -515,6 +502,16 @@ import apiService from '@/services/api'
 				}
 				
 				return filtered;
+			},
+			// Check if all visible rows are selected
+			isAllSelected() {
+				return this.filteredSummaryData.length > 0 && 
+				       this.selectedRows.length === this.filteredSummaryData.length;
+			},
+			// Check if some but not all rows are selected
+			isIndeterminate() {
+				return this.selectedRows.length > 0 && 
+				       this.selectedRows.length < this.filteredSummaryData.length;
 			}
 		},
 		
@@ -855,21 +852,38 @@ import apiService from '@/services/api'
 					}
 				});
 			},
-			selectRow(index) {
-				// Toggle selection - if clicking the same row, deselect it
-				if (this.selectedRowIndex === index) {
-					this.selectedRowIndex = null;
+			// Check if a specific row is selected
+			isRowSelected(index) {
+				return this.selectedRows.includes(index);
+			},
+			// Toggle row selection (supports multi-select)
+			toggleRowSelection(index, event) {
+				const selectedIndex = this.selectedRows.indexOf(index);
+				if (selectedIndex > -1) {
+					// Row is selected, deselect it
+					this.selectedRows.splice(selectedIndex, 1);
 				} else {
-					this.selectedRowIndex = index;
+					// Row is not selected, add it
+					this.selectedRows.push(index);
 				}
 			},
+			// Handle checkbox change
 			handleCheckboxChange(index) {
-				// Sync checkbox state with row selection
-				if (this.selectedRowIndex === index) {
-					this.selectedRowIndex = null;
+				this.toggleRowSelection(index);
+			},
+			// Toggle select all rows
+			toggleSelectAll() {
+				if (this.isAllSelected) {
+					// Deselect all
+					this.selectedRows = [];
 				} else {
-					this.selectedRowIndex = index;
+					// Select all visible rows
+					this.selectedRows = this.filteredSummaryData.map((_, index) => index);
 				}
+			},
+			// Clear all selections
+			clearSelection() {
+				this.selectedRows = [];
 			},
 			getScoreRange(score) {
 				// Determine score range for color coding
@@ -887,28 +901,37 @@ import apiService from '@/services/api'
 					return;
 				}
 				
-				// Find the institution ID
-				const institution = this.institutions.find(inst => inst.name === entry.institute);
-				if (!institution) {
-					this.$message.error('Institution not found. Please reload the page.');
-					return;
+				let institutionId = entry.institution_id;
+				let awardId = entry.award_id;
+				
+				// If IDs are not directly available, find them by name
+				if (!institutionId) {
+					const institution = this.institutions.find(inst => inst.name === entry.institute);
+					if (!institution) {
+						this.$message.error('Institution not found. Please reload the page.');
+						return;
+					}
+					institutionId = institution.id;
 				}
 				
 				// Set the institution first
-				this.selectedInstitute = institution.id;
+				this.selectedInstitute = institutionId;
 				
 				// Load awards for the institution
-				await this.loadAwardsForInstitution(institution.id);
+				await this.loadAwardsForInstitution(institutionId);
 				
-				// Find the award ID
-				const award = this.availableAwards.find(a => a.category === entry.award);
-				if (!award) {
-					this.$message.error('Award not found for this institution.');
-					return;
+				// If award ID is not directly available, find it by name
+				if (!awardId) {
+					const award = this.availableAwards.find(a => a.category === entry.award);
+					if (!award) {
+						this.$message.error('Award not found for this institution.');
+						return;
+					}
+					awardId = award.id;
 				}
 				
 				// Set the award
-				this.selectedAward = award.id;
+				this.selectedAward = awardId;
 				
 				// Set edit mode
 				this.isEditMode = true;
@@ -918,13 +941,13 @@ import apiService from '@/services/api'
 				await this.fetchAwardWeightages();
 				await this.fetchMarkingCriteria();
 				
-				// Load the marks from the entry
-				if (this.markingCriteria.length >= 5) {
-					this.markingCriteria[0].marks = entry.c1 || 0;
-					this.markingCriteria[1].marks = entry.c2 || 0;
-					this.markingCriteria[2].marks = entry.c3 || 0;
-					this.markingCriteria[3].marks = entry.c4 || 0;
-					this.markingCriteria[4].marks = entry.c5 || 0;
+				// Load the marks from the entry - supports up to 10 criteria
+				const criteriaMarks = [entry.c1, entry.c2, entry.c3, entry.c4, entry.c5, 
+				                      entry.c6, entry.c7, entry.c8, entry.c9, entry.c10];
+				for (let i = 0; i < this.markingCriteria.length && i < 10; i++) {
+					if (criteriaMarks[i] !== null && criteriaMarks[i] !== undefined) {
+						this.markingCriteria[i].marks = criteriaMarks[i];
+					}
 				}
 				
 				// If we have the evaluation ID, load full data from API
@@ -938,48 +961,84 @@ import apiService from '@/services/api'
 				window.scrollTo({ top: 0, behavior: 'smooth' });
 			},
 			async editSelectedRow() {
-				if (this.selectedRowIndex !== null) {
-					await this.editRow(this.selectedRowIndex);
+				if (this.selectedRows.length === 1) {
+					await this.editRow(this.selectedRows[0]);
+					this.clearSelection();
+				} else if (this.selectedRows.length > 1) {
+					this.$message.warning('Please select only one row to edit');
 				}
 			},
-			async deleteSelectedRow() {
-				if (this.selectedRowIndex === null) {
-					this.$message.warning('Please select a row to delete');
+			async deleteSelectedRows() {
+				if (this.selectedRows.length === 0) {
+					this.$message.warning('Please select at least one row to delete');
 					return;
 				}
 				
-				const entry = this.filteredSummaryData[this.selectedRowIndex];
+				// Get the entries to delete (sorted in descending order for safe removal)
+				const selectedIndices = [...this.selectedRows].sort((a, b) => b - a);
+				const entriesToDelete = selectedIndices.map(index => this.filteredSummaryData[index]);
+				
+				const deleteCount = entriesToDelete.length;
+				const confirmMessage = deleteCount === 1 
+					? `Are you sure you want to delete the evaluation for ${entriesToDelete[0].institute} - ${entriesToDelete[0].award}?`
+					: `Are you sure you want to delete ${deleteCount} evaluations? This action cannot be undone.`;
+				
 				this.$confirm({
-					title: 'Delete Entry',
-					content: `Are you sure you want to delete the evaluation for ${entry.institute} - ${entry.award}? This action cannot be undone.`,
+					title: deleteCount === 1 ? 'Delete Entry' : `Delete ${deleteCount} Entries`,
+					content: confirmMessage,
 					okText: 'Yes, Delete',
 					cancelText: 'Cancel',
 					onOk: async () => {
 						try {
-							// If entry has an ID, delete from API
-							if (entry.id) {
-								const response = await apiService.delete(`/judger/evaluations/${entry.id}`);
-								
-								if (!response.success) {
-									this.$message.error(response.message || 'Failed to delete evaluation');
-									return;
+							let successCount = 0;
+							let failCount = 0;
+							
+							// Delete each entry
+							for (const entry of entriesToDelete) {
+								try {
+									// If entry has an ID, delete from API
+									if (entry.id) {
+										const response = await apiService.delete(`/judger/evaluations/${entry.id}`);
+										
+										if (!response.success) {
+											failCount++;
+											continue;
+										}
+									}
+									
+									// Remove from local summaryData
+									const actualIndex = this.summaryData.findIndex(
+										item => (item.id && item.id === entry.id) || 
+										(item.institute === entry.institute && item.award === entry.award)
+									);
+									if (actualIndex !== -1) {
+										this.summaryData.splice(actualIndex, 1);
+										successCount++;
+									}
+								} catch (error) {
+									console.error('Error deleting entry:', error);
+									failCount++;
 								}
 							}
 							
-							// Remove from local summaryData
-							const actualIndex = this.summaryData.findIndex(
-								item => (item.id && item.id === entry.id) || 
-								(item.institute === entry.institute && item.award === entry.award)
-							);
-							if (actualIndex !== -1) {
-								this.summaryData.splice(actualIndex, 1);
-							}
+							// Clear selection
+							this.clearSelection();
 							
-							this.selectedRowIndex = null;
-							this.$message.success('Evaluation deleted successfully');
+							// Show result message
+							if (failCount === 0) {
+								this.$message.success(
+									successCount === 1 
+										? 'Evaluation deleted successfully' 
+										: `${successCount} evaluations deleted successfully`
+								);
+							} else if (successCount > 0) {
+								this.$message.warning(`${successCount} deleted, ${failCount} failed`);
+							} else {
+								this.$message.error('Failed to delete evaluations');
+							}
 						} catch (error) {
-							console.error('Error deleting evaluation:', error);
-							this.$message.error('Failed to delete evaluation. Please try again.');
+							console.error('Error deleting evaluations:', error);
+							this.$message.error('Failed to delete evaluations. Please try again.');
 						}
 					}
 				});
@@ -1062,15 +1121,23 @@ import apiService from '@/services/api'
 							if (response.success) {
 								const newEntry = {
 									id: response.data?.id || this.editingEvaluationId,
+									institution_id: this.selectedInstitute,
+									award_id: this.selectedAward,
 									institute: this.getInstituteName(this.selectedInstitute),
 									award: this.getAwardName(this.selectedAward),
-									c1: this.markingCriteria[0]?.marks || 0,
-									c2: this.markingCriteria[1]?.marks || 0,
-									c3: this.markingCriteria[2]?.marks || 0,
-									c4: this.markingCriteria[3]?.marks || 0,
-									c5: this.markingCriteria[4]?.marks || 0,
-									presentation: this.totalMarks,
-									overall: parseFloat(this.calculateAggregateScore())
+									c1: this.markingCriteria[0]?.marks || null,
+									c2: this.markingCriteria[1]?.marks || null,
+									c3: this.markingCriteria[2]?.marks || null,
+									c4: this.markingCriteria[3]?.marks || null,
+									c5: this.markingCriteria[4]?.marks || null,
+									c6: this.markingCriteria[5]?.marks || null,
+									c7: this.markingCriteria[6]?.marks || null,
+									c8: this.markingCriteria[7]?.marks || null,
+									c9: this.markingCriteria[8]?.marks || null,
+									c10: this.markingCriteria[9]?.marks || null,
+									presentationScore: parseFloat(this.calculatePresentationScore()),
+									volumeWiseScore: this.institutionMarks,
+									aggregatedScore: parseFloat(this.calculateAggregateScore())
 								};
 								
 								if (this.isEditMode) {
@@ -1136,6 +1203,8 @@ import apiService from '@/services/api'
 			},
 			filterSummary() {
 				// Filter is handled by computed property
+				// Clear selections when filters change to avoid index mismatches
+				this.clearSelection();
 			},
 			getInstituteName(value) {
 				// If value is a number (ID), find institution by ID
@@ -1208,18 +1277,26 @@ import apiService from '@/services/api'
 			try {
 				const response = await apiService.get('/judger/evaluations', { limit: 50 });
 				if (response.success && response.data && response.data.data) {
-					// Map API data to summary format
+					// Map API data to summary format - supports up to 10 criteria
 					this.summaryData = response.data.data.map(evaluation => ({
 						id: evaluation.id,
+						institution_id: evaluation.institution_id,
+						award_id: evaluation.award_id,
 						institute: evaluation.institution_name,
 						award: evaluation.award_category,
-						c1: evaluation.criteria_1_marks || 0,
-						c2: evaluation.criteria_2_marks || 0,
-						c3: evaluation.criteria_3_marks || 0,
-						c4: evaluation.criteria_4_marks || 0,
-						c5: evaluation.criteria_5_marks || 0,
-						presentation: evaluation.total_achieved_marks || evaluation.total_marks || 0,
-						overall: evaluation.aggregated_score || evaluation.total_marks || 0
+						c1: evaluation.criteria_1_marks || null,
+						c2: evaluation.criteria_2_marks || null,
+						c3: evaluation.criteria_3_marks || null,
+						c4: evaluation.criteria_4_marks || null,
+						c5: evaluation.criteria_5_marks || null,
+						c6: evaluation.criteria_6_marks || null,
+						c7: evaluation.criteria_7_marks || null,
+						c8: evaluation.criteria_8_marks || null,
+						c9: evaluation.criteria_9_marks || null,
+						c10: evaluation.criteria_10_marks || null,
+						presentationScore: evaluation.presentation_score || 0,
+						volumeWiseScore: evaluation.preliminary_score || 0,
+						aggregatedScore: evaluation.aggregated_score || 0
 					}));
 				}
 			} catch (error) {
@@ -1510,6 +1587,25 @@ import apiService from '@/services/api'
 	align-items: center;
 }
 
+// Selected count indicator
+.selected-count {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 10px;
+	background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+	border: 1px solid #93c5fd;
+	border-radius: 12px;
+	color: #1e40af;
+	font-size: 12px;
+	font-weight: 600;
+	margin-right: 4px;
+}
+
+// Select all checkbox styling
+.select-all-checkbox {
+	cursor: pointer;
+}
+
 .summary-delete-btn {
 	display: inline-flex;
 	align-items: center;
@@ -1564,78 +1660,165 @@ import apiService from '@/services/api'
 	}
 }
 
-// Modern Evaluation Table
+// Modern Evaluation Table - Fixed Layout
 .modern-evaluation-table {
 	width: 100%;
+	min-width: 1500px;
 	border-collapse: collapse;
 	background: white;
-	font-size: 13px;
-	border-radius: 12px;
-	overflow: hidden;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-	
-	@media (min-width: 768px) {
-		font-size: 14px;
-	}
-	
-	@media (min-width: 1024px) {
-		font-size: 15px;
-	}
+	font-size: 12px;
+	table-layout: fixed;
 }
+
+// Colgroup - Fixed column widths for alignment
+.col-checkbox { width: 35px; }
+.col-institute { width: 130px; }
+.col-award { width: 150px; }
+.col-criteria { width: 50px; }
+.col-pres-score { width: 75px; }
+.col-volume-score { width: 75px; }
+.col-aggregate { width: 70px; }
 
 .table-header {
-	background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-	position: relative;
+	background: linear-gradient(135deg, #E8F1FD 0%, #F0F7FF 100%);
+	border-bottom: 2px solid #3b82f6;
 	
-	&::after {
-		content: '';
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		height: 2px;
-		background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%);
+	tr {
+		height: 40px;
 	}
 }
 
-.modern-evaluation-table th {
-	padding: 12px 8px;
+// Header cells - consistent styling
+.th-checkbox,
+.th-institute,
+.th-award,
+.th-criteria,
+.th-pres-score,
+.th-volume-score,
+.th-aggregate {
+	padding: 8px 4px;
 	text-align: center;
 	font-weight: 700;
-	font-size: 13px;
+	font-size: 11px;
 	color: #1E293B;
-	letter-spacing: 0.025em;
+	letter-spacing: 0.02em;
 	border: none;
-	background: transparent;
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+.th-checkbox { text-align: center; }
+.th-institute { text-align: left; padding-left: 8px; }
+.th-award { text-align: left; padding-left: 6px; }
+.th-criteria { text-align: center; font-size: 10px; }
+.th-pres-score { text-align: center; font-size: 10px; }
+.th-volume-score { text-align: center; font-size: 10px; }
+.th-aggregate { text-align: center; font-size: 10px; }
+
+// Data cells - consistent styling matching headers
+.td-checkbox,
+.td-institute,
+.td-award,
+.td-criteria,
+.td-pres-score,
+.td-volume-score,
+.td-aggregate {
+	padding: 6px 4px;
+	border: none;
+	vertical-align: middle;
+	font-size: 12px;
+}
+
+.td-checkbox {
+	text-align: center;
+}
+
+.td-institute {
+	text-align: left;
+	padding-left: 8px;
 	
-	@media (min-width: 768px) {
-		padding: 14px 10px;
-		font-size: 14px;
-	}
-	
-	@media (min-width: 1024px) {
-		padding: 16px 12px;
-		font-size: 15px;
+	.institute-name {
+		font-weight: 600;
+		font-size: 12px;
+		color: #1E293B;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 }
 
+.td-award {
+	text-align: left;
+	padding-left: 6px;
+	
+	.award-text {
+		font-weight: 500;
+		font-size: 11px;
+		color: #475569;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+}
+
+.td-criteria {
+	text-align: center;
+	font-weight: 600;
+	font-size: 12px;
+	color: #1E293B;
+}
+
+.td-pres-score {
+	text-align: center;
+	font-weight: 600;
+	font-size: 12px;
+	color: #059669;
+}
+
+.td-volume-score {
+	text-align: center;
+	font-weight: 600;
+	font-size: 12px;
+	color: #7c3aed;
+}
+
+.td-aggregate {
+	text-align: center;
+	font-weight: 700;
+	font-size: 12px;
+	color: #2563EB;
+}
+
+.aggregate-score-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.aggregate-score-value {
+	font-weight: 700;
+	font-size: 12px;
+	color: #2563EB;
+}
+
+// Legacy column classes for backward compatibility
 .checkbox-column {
-	width: 40px;
+	width: 35px;
 	text-align: center;
 }
 
 .institute-column {
-	width: 20%;
+	width: 130px;
 	text-align: left;
 }
 
 .award-column {
-	width: 25%;
+	width: 150px;
 	text-align: left;
 }
 
 .criteria-column {
-	width: 8%;
+	width: 50px;
 	text-align: center;
 }
 
