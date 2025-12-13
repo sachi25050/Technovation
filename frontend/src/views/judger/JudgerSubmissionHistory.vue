@@ -65,19 +65,24 @@
 					<div class="modern-table-wrapper">
 						<div class="table-container">
 							<table class="modern-evaluation-table">
+								<colgroup>
+									<col class="col-checkbox" />
+									<col class="col-institute" />
+									<col class="col-award" />
+									<col v-for="n in 10" :key="'col-c'+n" class="col-criteria" />
+									<col class="col-presentation" />
+									<col class="col-overall" />
+									<col class="col-actions" />
+								</colgroup>
 								<thead class="table-header">
 									<tr>
-										<th class="checkbox-column"></th>
-										<th class="institute-column">Institute Name</th>
-										<th class="award-column">Award Category</th>
-										<th class="criteria-column">C-01</th>
-										<th class="criteria-column">C-02</th>
-										<th class="criteria-column">C-03</th>
-										<th class="criteria-column">C-04</th>
-										<th class="criteria-column">C-05</th>
-										<th class="presentation-column">Presentation</th>
-										<th class="overall-column">Overall</th>
-										<th class="actions-column">Actions</th>
+										<th class="th-checkbox"></th>
+										<th class="th-institute">Institute Name</th>
+										<th class="th-award">Award Category</th>
+										<th v-for="n in 10" :key="'th-c'+n" class="th-criteria">C-{{ String(n).padStart(2, '0') }}</th>
+										<th class="th-presentation">Presentation</th>
+										<th class="th-overall">Overall</th>
+										<th class="th-actions">Actions</th>
 									</tr>
 								</thead>
 								<tbody class="table-body">
@@ -91,7 +96,7 @@
 										@click="selectRow(index)"
 										@keydown.space.prevent="selectRow(index)"
 										@keydown.enter.prevent="selectRow(index)">
-										<td class="checkbox-cell">
+										<td class="td-checkbox">
 											<input 
 												type="checkbox"
 												:checked="selectedRowIndex === index"
@@ -102,19 +107,24 @@
 												:aria-describedby="`row-${index}-description`"
 											/>
 										</td>
-										<td class="institute-cell" :id="`row-${index}-description`">
+										<td class="td-institute" :id="`row-${index}-description`">
 											<span class="institute-name">{{ entry.institute }}</span>
 										</td>
-										<td class="award-cell">
+										<td class="td-award">
 											<span class="award-text">{{ entry.award }}</span>
 										</td>
-										<td class="criteria-cell">{{ entry.c1 }}</td>
-										<td class="criteria-cell">{{ entry.c2 }}</td>
-										<td class="criteria-cell">{{ entry.c3 }}</td>
-										<td class="criteria-cell">{{ entry.c4 }}</td>
-										<td class="criteria-cell">{{ entry.c5 }}</td>
-										<td class="presentation-cell">{{ entry.presentation }}</td>
-										<td class="overall-cell">
+										<td class="td-criteria">{{ entry.c1 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c2 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c3 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c4 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c5 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c6 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c7 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c8 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c9 || '-' }}</td>
+										<td class="td-criteria">{{ entry.c10 || '-' }}</td>
+										<td class="td-presentation">{{ entry.presentation }}</td>
+										<td class="td-overall">
 											<div class="overall-score-container" :data-score="getScoreRange(entry.overall)">
 												<span class="overall-score-value">{{ entry.overall }}</span>
 												<div class="tiny-progress-bar">
@@ -122,11 +132,11 @@
 												</div>
 											</div>
 										</td>
-										<td class="actions-cell">
+										<td class="td-actions">
 											<a-button 
 												type="primary" 
 												size="small" 
-												@click="viewDetails(entry)"
+												@click.stop="viewDetails(entry)"
 												class="action-btn view-btn"
 											>
 												View
@@ -134,10 +144,18 @@
 											<a-button 
 												type="default" 
 												size="small" 
-												@click="editSubmission(entry)"
+												@click.stop="editSubmission(entry)"
 												class="action-btn edit-btn"
 											>
 												Edit
+											</a-button>
+											<a-button 
+												type="danger" 
+												size="small" 
+												@click.stop="deleteSubmission(entry)"
+												class="action-btn delete-btn"
+											>
+												Delete
 											</a-button>
 										</td>
 									</tr>
@@ -351,18 +369,23 @@ export default {
 			try {
 				const response = await apiService.get('/judger/evaluations', { limit: 100 });
 				if (response.success && response.data && response.data.data) {
-					// Map API data to summary format
+					// Map API data to summary format - supports up to 10 criteria
 					this.summaryData = response.data.data.map(evaluation => ({
 						id: evaluation.id,
 						institution_id: evaluation.institution_id,
 						award_id: evaluation.award_id,
 						institute: evaluation.institution_name,
 						award: evaluation.award_category,
-						c1: evaluation.criteria_1_marks || 0,
-						c2: evaluation.criteria_2_marks || 0,
-						c3: evaluation.criteria_3_marks || 0,
-						c4: evaluation.criteria_4_marks || 0,
-						c5: evaluation.criteria_5_marks || 0,
+						c1: evaluation.criteria_1_marks || null,
+						c2: evaluation.criteria_2_marks || null,
+						c3: evaluation.criteria_3_marks || null,
+						c4: evaluation.criteria_4_marks || null,
+						c5: evaluation.criteria_5_marks || null,
+						c6: evaluation.criteria_6_marks || null,
+						c7: evaluation.criteria_7_marks || null,
+						c8: evaluation.criteria_8_marks || null,
+						c9: evaluation.criteria_9_marks || null,
+						c10: evaluation.criteria_10_marks || null,
 						presentation: evaluation.total_achieved_marks || evaluation.total_marks || 0,
 						overall: evaluation.aggregated_score || evaluation.total_marks || 0,
 						submittedDate: evaluation.created_at || evaluation.submitted_at
@@ -432,6 +455,42 @@ export default {
 							award_id: submission.award_id
 						}
 					});
+				}
+			});
+		},
+		deleteSubmission(submission) {
+			this.$confirm({
+				title: 'Delete Submission',
+				content: `Are you sure you want to delete the submission for ${submission.institute} - ${submission.award}? This action cannot be undone.`,
+				okText: 'Yes, Delete',
+				okType: 'danger',
+				cancelText: 'Cancel',
+				onOk: async () => {
+					try {
+						if (submission.id) {
+							const response = await apiService.delete(`/judger/evaluations/${submission.id}`);
+							
+							if (!response.success) {
+								this.$message.error(response.message || 'Failed to delete submission');
+								return;
+							}
+						}
+						
+						// Remove from local summaryData
+						const index = this.summaryData.findIndex(
+							item => (item.id && item.id === submission.id) || 
+							(item.institute === submission.institute && item.award === submission.award)
+						);
+						if (index !== -1) {
+							this.summaryData.splice(index, 1);
+						}
+						
+						this.selectedRowIndex = null;
+						this.$message.success('Submission deleted successfully');
+					} catch (error) {
+						console.error('Error deleting submission:', error);
+						this.$message.error('Failed to delete submission. Please try again.');
+					}
 				}
 			});
 		},
@@ -666,6 +725,7 @@ export default {
 	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 	overflow: hidden;
 	margin: 0;
+	border: 1px solid #e2e8f0;
 }
 
 .table-container {
@@ -675,59 +735,80 @@ export default {
 	
 	// Custom scrollbar styling
 	&::-webkit-scrollbar {
-		height: 6px;
+		height: 8px;
 	}
 	
 	&::-webkit-scrollbar-track {
-		background: #f8fafc;
-		border-radius: 3px;
+		background: #f1f5f9;
+		border-radius: 4px;
 	}
 	
 	&::-webkit-scrollbar-thumb {
-		background: #cbd5e1;
-		border-radius: 3px;
-		transition: background 0.2s ease;
+		background: #94a3b8;
+		border-radius: 4px;
 		
 		&:hover {
-			background: #94a3b8;
+			background: #64748b;
 		}
 	}
 }
 
-// Modern Evaluation Table
+// Modern Evaluation Table - Fixed Layout for Alignment
 .modern-evaluation-table {
 	width: 100%;
-	min-width: 900px; // Reduced minimum width for better fit
-	border-collapse: separate;
+	min-width: 1400px; // Enough for 10 criteria columns + other columns
+	border-collapse: collapse;
 	border-spacing: 0;
 	background: white;
-	font-family: 'Inter', 'Poppins', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
-	table-layout: auto; // Allow natural column sizing
+	font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+	table-layout: fixed; // Fixed layout for consistent column widths
 }
 
-// Table Header - Modern Gradient
+// Colgroup - Define fixed column widths
+.col-checkbox { width: 40px; }
+.col-institute { width: 140px; }
+.col-award { width: 160px; }
+.col-criteria { width: 50px; }
+.col-presentation { width: 75px; }
+.col-overall { width: 65px; }
+.col-actions { width: 150px; }
+
+// Table Header - Modern Gradient with fixed alignment
 .table-header {
 	background: linear-gradient(135deg, #E8F1FD 0%, #F0F7FF 100%);
-	position: sticky;
-	top: 0;
-	z-index: 10;
+	border-bottom: 2px solid #3b82f6;
 	
-	th {
-		padding: 8px 6px;
-		text-align: center;
-		font-weight: 700;
-		font-size: 10px;
-		color: #1E293B;
-		letter-spacing: 0.025em;
-		border: none;
-		white-space: nowrap;
-		position: relative;
-		
-		&:first-child {
-			text-align: center;
-		}
+	tr {
+		height: 44px;
 	}
 }
+
+// Header cells - consistent styling
+.th-checkbox,
+.th-institute,
+.th-award,
+.th-criteria,
+.th-presentation,
+.th-overall,
+.th-actions {
+	padding: 10px 4px;
+	text-align: center;
+	font-weight: 700;
+	font-size: 12px;
+	color: #1E293B;
+	letter-spacing: 0.02em;
+	border: none;
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+.th-checkbox { text-align: center; }
+.th-institute { text-align: left; padding-left: 12px; }
+.th-award { text-align: left; padding-left: 8px; }
+.th-criteria { text-align: center; font-size: 11px; }
+.th-presentation { text-align: center; font-size: 11px; }
+.th-overall { text-align: center; }
+.th-actions { text-align: center; }
 
 // Table Body
 .table-body {
@@ -737,26 +818,19 @@ export default {
 // Evaluation Rows - Interactive and Accessible
 .evaluation-row {
 	background: white;
-	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	transition: background 0.15s ease;
 	border-bottom: 1px solid #f1f5f9;
 	cursor: pointer;
-	position: relative;
+	height: 48px;
 	
 	&:hover {
 		background: #F5F9FF;
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
 	}
 	
 	&.selected-row {
-		background: rgba(37, 99, 235, 0.15) !important;
-		border-left: 5px solid #2563EB;
-		box-shadow: 0 6px 20px rgba(37, 99, 235, 0.2);
-		transform: translateY(-2px);
-		border-top: 1px solid rgba(37, 99, 235, 0.2);
-		border-bottom: 1px solid rgba(37, 99, 235, 0.2);
+		background: rgba(37, 99, 235, 0.1) !important;
+		border-left: 4px solid #2563EB;
 		
-		// Enhanced text styling for selected row
 		.institute-name {
 			color: #1E40AF;
 			font-weight: 700;
@@ -767,14 +841,9 @@ export default {
 			font-weight: 600;
 		}
 		
-		.criteria-cell, .presentation-cell, .overall-cell {
+		.td-criteria, .td-presentation, .td-overall {
 			color: #1E40AF;
 			font-weight: 700;
-		}
-		
-		.overall-cell {
-			color: #1D4ED8;
-			font-weight: 800;
 		}
 	}
 	
@@ -788,111 +857,94 @@ export default {
 	}
 }
 
-// Cell Styling - Compact Padding and Fonts
-.modern-evaluation-table td {
-	padding: 8px 6px;
+// Data cells - consistent styling matching headers
+.td-checkbox,
+.td-institute,
+.td-award,
+.td-criteria,
+.td-presentation,
+.td-overall,
+.td-actions {
+	padding: 8px 4px;
 	border: none;
 	vertical-align: middle;
-	transition: all 0.2s ease;
+	font-size: 13px;
 }
 
-// Checkbox Column
-.checkbox-column {
-	width: 60px;
+.td-checkbox {
 	text-align: center;
+	padding: 8px 4px;
 }
 
-.checkbox-cell {
-	width: 50px;
-	text-align: center;
-	padding: 8px 4px !important;
-	vertical-align: middle;
-}
-
-// Institute Column - Optimized for Page Fit
-.institute-column {
+.td-institute {
 	text-align: left;
-	min-width: 180px;
-	width: 20%;
-}
-
-.institute-cell {
-	text-align: left;
-	min-width: 180px;
+	padding-left: 12px;
 	
 	.institute-name {
 		font-weight: 600;
-		font-size: 10px;
+		font-size: 13px;
 		color: #1E293B;
 		white-space: nowrap;
-		overflow: visible;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		display: block;
 	}
 }
 
-// Award Column - Optimized for Page Fit
-.award-column {
+.td-award {
 	text-align: left;
-	min-width: 250px;
-	width: 30%;
-}
-
-.award-cell {
-	text-align: left;
-	min-width: 250px;
+	padding-left: 8px;
 	
 	.award-text {
 		font-weight: 500;
-		font-size: 10px;
+		font-size: 12px;
 		color: #475569;
-		line-height: 1.4;
+		line-height: 1.3;
 		white-space: nowrap;
-		overflow: visible;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		display: block;
 	}
 }
 
-// Criteria Columns - Compact Center Aligned
-.criteria-column, .presentation-column, .overall-column {
-	text-align: center;
-	min-width: 70px;
-	width: 8%;
-}
-
-.criteria-cell, .presentation-cell, .overall-cell {
+.td-criteria {
 	text-align: center;
 	font-weight: 600;
-	font-size: 6px;
+	font-size: 13px;
 	color: #1E293B;
-	min-width: 70px;
 }
 
-.overall-cell {
+.td-presentation {
+	text-align: center;
+	font-weight: 600;
+	font-size: 13px;
+	color: #1E293B;
+}
+
+.td-overall {
+	text-align: center;
 	font-weight: 700;
-	font-size: 11px;
+	font-size: 13px;
 	color: #2563EB;
 }
 
-// Actions Column
-.actions-column {
+.td-actions {
 	text-align: center;
-	min-width: 120px;
-	width: 10%;
-}
-
-.actions-cell {
-	text-align: center;
-	padding: 8px 4px !important;
+	padding: 6px 4px;
+	white-space: nowrap;
 }
 
 .action-btn {
 	margin: 0 2px;
 	font-size: 10px;
-	padding: 4px 8px;
+	padding: 2px 6px;
+	height: 24px;
+	line-height: 1;
 	
 	&.view-btn {
 		background: #3B82F6;
 		border-color: #3B82F6;
+		color: white;
 		
 		&:hover {
 			background: #2563EB;
@@ -908,6 +960,17 @@ export default {
 		&:hover {
 			background: #059669;
 			border-color: #059669;
+		}
+	}
+	
+	&.delete-btn {
+		background: #EF4444;
+		border-color: #EF4444;
+		color: white;
+		
+		&:hover {
+			background: #DC2626;
+			border-color: #DC2626;
 		}
 	}
 }
