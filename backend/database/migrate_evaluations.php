@@ -78,10 +78,10 @@ $migrations = [
       `id` int(11) NOT NULL AUTO_INCREMENT,
       `evaluation_id` int(11) NOT NULL COMMENT 'Reference to evaluations.id',
       `criterion_id` int(11) NOT NULL COMMENT 'Reference to award_criteria.id',
-      `criterion_name` varchar(255) NULL COMMENT 'Criterion name (denormalized for reporting)',
-      `display_order` int(11) DEFAULT 0 COMMENT 'Order of the criterion (1-10)',
       `allocated_marks` decimal(10,2) NOT NULL DEFAULT 0 COMMENT 'Maximum marks for this criterion',
       `achieved_marks` decimal(10,2) NOT NULL DEFAULT 0 COMMENT 'Marks achieved by institution',
+      `criterion_name` varchar(255) NULL COMMENT 'Criterion name (denormalized for reporting)',
+      `display_order` int(11) DEFAULT 0 COMMENT 'Order of the criterion (1-10)',
       `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
       `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       PRIMARY KEY (`id`),
@@ -191,6 +191,33 @@ foreach ($awardColumns as $columnName => $sql) {
         }
     } catch (PDOException $e) {
         echo "⚠️  Column 'awards.$columnName': " . substr($e->getMessage(), 0, 60) . "\n";
+    }
+}
+
+// Add missing columns to evaluation_criteria_marks table (in case it already existed)
+echo "\nAdding evaluation_criteria_marks columns (if missing)...\n";
+
+$ecmColumns = [
+    ['criterion_name', 'varchar(255) NULL COMMENT "Criterion name (denormalized for reporting)"'],
+    ['display_order', 'int(11) DEFAULT 0 COMMENT "Order of the criterion (1-10)"']
+];
+
+foreach ($ecmColumns as $col) {
+    $name = $col[0];
+    $definition = $col[1];
+    
+    try {
+        $checkStmt = $db->query("SHOW COLUMNS FROM `evaluation_criteria_marks` LIKE '$name'");
+        $exists = $checkStmt->fetch();
+        
+        if (!$exists) {
+            $db->exec("ALTER TABLE `evaluation_criteria_marks` ADD COLUMN `$name` $definition");
+            echo "✅ Column 'evaluation_criteria_marks.$name' added\n";
+        } else {
+            echo "ℹ️  Column 'evaluation_criteria_marks.$name' already exists\n";
+        }
+    } catch (PDOException $e) {
+        echo "⚠️  Column 'evaluation_criteria_marks.$name': " . substr($e->getMessage(), 0, 60) . "\n";
     }
 }
 

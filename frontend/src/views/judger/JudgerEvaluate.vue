@@ -201,9 +201,9 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 							</tbody>
 						</table>
 						</div>
-						<div v-if="totalMarks !== totalAllocated && selectedInstitute && selectedAward" class="modern-warning">
+						<div v-if="totalMarks > totalAllocated && selectedInstitute && selectedAward" class="modern-warning">
 							<div class="warning-icon">⚠️</div>
-							<span class="warning-text">Maximum total marks must be 100</span>
+							<span class="warning-text">Total achieved marks ({{ totalMarks }}) cannot exceed allocated marks ({{ totalAllocated }})</span>
 					</div>
 						</div>
 					<div class="modern-action-buttons">
@@ -471,7 +471,8 @@ import apiService from '@/services/api'
 			canSubmit() {
 				return this.selectedInstitute && 
 					   this.selectedAward && 
-					   this.totalMarks === this.totalAllocated &&
+					   this.totalMarks <= this.totalAllocated &&
+					   this.totalMarks > 0 &&
 					   this.markingCriteria.every(c => c.marks !== null && c.marks >= 0) &&
 					   this.markingCriteria.length > 0;
 			},
@@ -811,7 +812,7 @@ import apiService from '@/services/api'
 			this.preliminaryWeightage = 0;
 			this.institutionMarks = 0;
 		},
-			submitMarks() {
+			async submitMarks() {
 				if (!this.canSubmit) {
 					this.$message.error(`Please complete all required fields and ensure total marks equal ${this.totalAllocated}`);
 					return;
@@ -822,29 +823,67 @@ import apiService from '@/services/api'
 					content: `Are you sure you want to submit marks for ${this.getInstituteName(this.selectedInstitute)} - ${this.getAwardName(this.selectedAward)}?`,
 					okText: 'Submit',
 					cancelText: 'Cancel',
-					onOk: () => {
-				// Add to summary data
-				const newEntry = {
-					institute: this.getInstituteName(this.selectedInstitute),
-					award: this.getAwardName(this.selectedAward),
-					c1: this.markingCriteria[0]?.marks || 0,
-					c2: this.markingCriteria[1]?.marks || 0,
-					c3: this.markingCriteria[2]?.marks || 0,
-					c4: this.markingCriteria[3]?.marks || 0,
-					c5: this.markingCriteria[4]?.marks || 0,
-					presentation: this.totalMarks,
-					overall: this.totalMarks
-				};
-				
-				this.summaryData.unshift(newEntry);
-				
-				// Show success message
-				this.$message.success(
-					`Marks successfully submitted for ${newEntry.institute} – ${newEntry.award}`
-				);
-				
-				// Reset form
-				this.resetForm();
+					onOk: async () => {
+						try {
+							// Prepare criteria marks data
+							const criteriaMarksData = this.markingCriteria.map((criterion, index) => ({
+								criterion_id: criterion.id || (index + 1),
+								name: criterion.name,
+								allocated_marks: criterion.allocated,
+								achieved_marks: criterion.marks || 0
+							}));
+							
+							// Prepare evaluation data
+							const evaluationData = {
+								institution_id: this.selectedInstitute,
+								award_id: this.selectedAward,
+								criteria_marks: criteriaMarksData,
+								total_achieved_marks: this.totalMarks,
+								total_allocated_marks: this.totalAllocated,
+								presentation_score: parseFloat(this.calculatePresentationScore()),
+								preliminary_score: this.institutionMarks,
+								aggregated_score: parseFloat(this.calculateAggregateScore()),
+								presentation_weightage: this.presentationWeightage,
+								preliminary_weightage: this.preliminaryWeightage,
+								status: 'submitted',
+								comments: ''
+							};
+							
+							// Submit to API
+							const response = await apiService.post('/judger/evaluations', evaluationData);
+							
+							if (response.success) {
+								// Add to local summary data for display
+								const newEntry = {
+									institute: this.getInstituteName(this.selectedInstitute),
+									award: this.getAwardName(this.selectedAward),
+									c1: this.markingCriteria[0]?.marks || 0,
+									c2: this.markingCriteria[1]?.marks || 0,
+									c3: this.markingCriteria[2]?.marks || 0,
+									c4: this.markingCriteria[3]?.marks || 0,
+									c5: this.markingCriteria[4]?.marks || 0,
+									presentation: this.totalMarks,
+									overall: parseFloat(this.calculateAggregateScore())
+								};
+								
+								this.summaryData.unshift(newEntry);
+								
+								// Show success message
+								this.$message.success(
+									`Marks successfully submitted for ${newEntry.institute} – ${newEntry.award}`
+								);
+								
+								// Reset form (without confirmation)
+								this.selectedInstitute = null;
+								this.selectedAward = null;
+								this.resetMarks();
+							} else {
+								this.$message.error(response.message || 'Failed to submit evaluation');
+							}
+						} catch (error) {
+							console.error('Error submitting evaluation:', error);
+							this.$message.error(error.message || 'Failed to submit evaluation. Please try again.');
+						}
 					}
 				});
 			},
@@ -933,6 +972,29 @@ import apiService from '@/services/api'
 			// Hide the broken image and show placeholder
 			event.target.style.display = 'none';
 			console.error('Failed to load institution image');
+		},
+		async loadEvaluations() {
+			try {
+				const response = await apiService.get('/judger/evaluations', { limit: 50 });
+				if (response.success && response.data && response.data.data) {
+					// Map API data to summary format
+					this.summaryData = response.data.data.map(evaluation => ({
+						id: evaluation.id,
+						institute: evaluation.institution_name,
+						award: evaluation.award_category,
+						c1: evaluation.criteria_1_marks || 0,
+						c2: evaluation.criteria_2_marks || 0,
+						c3: evaluation.criteria_3_marks || 0,
+						c4: evaluation.criteria_4_marks || 0,
+						c5: evaluation.criteria_5_marks || 0,
+						presentation: evaluation.total_achieved_marks || evaluation.total_marks || 0,
+						overall: evaluation.aggregated_score || evaluation.total_marks || 0
+					}));
+				}
+			} catch (error) {
+				console.error('Error loading evaluations:', error);
+				// Keep default sample data if API fails
+			}
 		}
 		},
 		mounted() {
@@ -960,6 +1022,9 @@ import apiService from '@/services/api'
 			
 			// Load institutions
 			this.loadInstitutions();
+			
+			// Load existing evaluations for summary table
+			this.loadEvaluations();
 		}
 	})
 </script>

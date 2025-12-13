@@ -18,8 +18,41 @@
 						@submit="handleSubmit"
 						layout="vertical"
 					>
+						<!-- Row 1: Personal Information -->
 						<a-row :gutter="16">
-							<a-col :span="12">
+							<a-col :span="24" :md="6">
+								<a-form-item label="Title">
+									<a-select
+										v-decorator="['title']"
+										placeholder="Select title"
+									>
+										<a-select-option value="Mr">Mr</a-select-option>
+										<a-select-option value="Mrs">Mrs</a-select-option>
+										<a-select-option value="Ms">Ms</a-select-option>
+									</a-select>
+								</a-form-item>
+							</a-col>
+							<a-col :span="24" :md="9">
+								<a-form-item label="First Name">
+									<a-input
+										v-decorator="['firstName']"
+										placeholder="Enter first name"
+									/>
+								</a-form-item>
+							</a-col>
+							<a-col :span="24" :md="9">
+								<a-form-item label="Last Name">
+									<a-input
+										v-decorator="['lastName']"
+										placeholder="Enter last name"
+									/>
+								</a-form-item>
+							</a-col>
+						</a-row>
+
+						<!-- Row 2: Account Credentials -->
+						<a-row :gutter="16">
+							<a-col :span="24" :md="12">
 								<a-form-item label="Username">
 									<a-input
 										v-decorator="[
@@ -32,7 +65,7 @@
 									/>
 								</a-form-item>
 							</a-col>
-							<a-col :span="12">
+							<a-col :span="24" :md="12">
 								<a-form-item label="Email">
 									<a-input
 										v-decorator="[
@@ -50,8 +83,9 @@
 							</a-col>
 						</a-row>
 
+						<!-- Row 3: Role & Security -->
 						<a-row :gutter="16">
-							<a-col :span="12">
+							<a-col :span="24" :md="12">
 								<a-form-item label="Role">
 									<a-select
 										v-decorator="[
@@ -68,7 +102,7 @@
 									</a-select>
 								</a-form-item>
 							</a-col>
-							<a-col :span="12">
+							<a-col :span="24" :md="12">
 								<a-form-item label="Password">
 									<a-input-password
 										v-decorator="[
@@ -136,38 +170,6 @@
 								Image selected successfully.
 							</div>
 						</a-form-item>
-
-						<a-row :gutter="16">
-							<a-col :span="8">
-								<a-form-item label="Title">
-									<a-select
-										v-decorator="['title']"
-										placeholder="Select title"
-									>
-										<a-select-option value="Mr">Mr</a-select-option>
-										<a-select-option value="Mrs">Mrs</a-select-option>
-										<a-select-option value="Ms">Ms</a-select-option>
-									</a-select>
-								</a-form-item>
-							</a-col>
-							<a-col :span="8">
-								<a-form-item label="First Name">
-									<a-input
-										v-decorator="['firstName']"
-										placeholder="Enter first name"
-									/>
-								</a-form-item>
-							</a-col>
-							<a-col :span="8">
-								<a-form-item label="Last Name">
-									<a-input
-										v-decorator="['lastName']"
-										placeholder="Enter last name"
-									/>
-								</a-form-item>
-							</a-col>
-						</a-row>
-
 
 						<a-form-item>
 							<a-button type="primary" html-type="submit" :loading="loading" size="large">
