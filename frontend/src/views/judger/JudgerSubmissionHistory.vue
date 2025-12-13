@@ -10,7 +10,7 @@
 			<div class="content-container">
 				<!-- Header Section -->
 				<div class="header-section">
-					<h2 class="page-title">Submission History</h2>
+					<h2 class="page-title">Your Submission History</h2>
 				</div>
 
 				<!-- Filter Section -->
@@ -23,13 +23,16 @@
 								placeholder="Select Award Category"
 								class="filter-select award-filter-full"
 								@change="filterSummary"
+								:loading="awardsLoading"
 							>
 								<a-select-option value="">All Categories</a-select-option>
-								<a-select-option value="award-14">Award No. 14 - Financial Institution of the Year</a-select-option>
-								<a-select-option value="award-6a">Award No. 6A - Most Popular Digital Payment Product - State Banks</a-select-option>
-								<a-select-option value="award-6b">Award No. 6B - Most Popular Digital Payment Product - Private Banks</a-select-option>
-								<a-select-option value="award-7">Award No. 7 - Best Digital Payment Innovation</a-select-option>
-								<a-select-option value="award-8">Award No. 8 - Best Digital Payment Security</a-select-option>
+								<a-select-option 
+									v-for="award in awards" 
+									:key="award.id" 
+									:value="award.id"
+								>
+									{{ award.category }}
+								</a-select-option>
 							</a-select>
 						</div>
 						<div class="filter-row">
@@ -39,14 +42,16 @@
 								placeholder="Select Institute"
 								class="filter-select institute-filter-full"
 								@change="filterSummary"
+								:loading="institutionsLoading"
 							>
 								<a-select-option value="">All Institutes</a-select-option>
-								<a-select-option value="Bank of Ceylon">Bank of Ceylon</a-select-option>
-								<a-select-option value="Commercial Bank of Ceylon PLC">Commercial Bank of Ceylon PLC</a-select-option>
-								<a-select-option value="People's Bank">People's Bank</a-select-option>
-								<a-select-option value="Sampath Bank PLC">Sampath Bank PLC</a-select-option>
-								<a-select-option value="Hatton National Bank PLC">Hatton National Bank PLC</a-select-option>
-								<a-select-option value="NDB Bank">NDB Bank</a-select-option>
+								<a-select-option 
+									v-for="institution in institutions" 
+									:key="institution.id" 
+									:value="institution.id"
+								>
+									{{ institution.name }}
+								</a-select-option>
 							</a-select>
 						</div>
 					</div>
@@ -55,7 +60,7 @@
 				<!-- Summary Section (Submission History) -->
 				<div class="summary-section">
 					<div class="summary-header">
-						<h3>Mr. Asita D B Talwatta - Submission History</h3>
+						<h3>{{ judgeName }} - Submission History</h3>
 					</div>
 					<div class="modern-table-wrapper">
 						<div class="table-container">
@@ -223,6 +228,8 @@
 </template>
 
 <script>
+import apiService from '@/services/api'
+
 export default {
 	name: 'JudgerSubmissionHistory',
 	data() {
@@ -233,42 +240,22 @@ export default {
 			selectedSubmission: null,
 			selectedRowIndex: null,
 			
-			// Summary data matching the original design
-			summaryData: [
-				{
-					institute: 'Bank of Ceylon',
-					award: 'Award No. 14 - Financial Institution of the Year for Best Digital Pay...',
-					c1: 10,
-					c2: 10,
-					c3: 10,
-					c4: 10,
-					c5: 10,
-					presentation: 100,
-					overall: 100
-				},
-				{
-					institute: 'Commercial Bank of Ceylon PLC',
-					award: 'Award No. 14 - Financial Institution of the Year for Best Digital Pa...',
-					c1: 10,
-					c2: 10,
-					c3: 10,
-					c4: 10,
-					c5: 10,
-					presentation: 50,
-					overall: 50
-				},
-				{
-					institute: 'Bank of Ceylon',
-					award: 'Award No. 6A - Most Popular Digital Payment Product - State Banks',
-					c1: 15,
-					c2: 20,
-					c3: 10,
-					c4: 15,
-					c5: 5,
-					presentation: 85,
-					overall: 8.5
-				}
-			]
+			// Institutions and Awards data from API
+			institutions: [],
+			institutionsLoading: false,
+			awards: [],
+			awardsLoading: false,
+			
+			// Current user info
+			currentUser: {
+				name: 'Judge',
+				title: null,
+				first_name: null,
+				last_name: null
+			},
+			
+			// Summary data - will be loaded from API
+			summaryData: []
 		}
 	},
 	computed: {
@@ -276,21 +263,130 @@ export default {
 			let filtered = this.summaryData;
 			
 			if (this.categoryFilter) {
+				// Filter by award ID or name
+				const awardName = this.getAwardName(this.categoryFilter);
 				filtered = filtered.filter(entry => 
-					entry.award.toLowerCase().includes(this.categoryFilter.toLowerCase())
+					entry.award_id === this.categoryFilter || 
+					entry.award.toLowerCase().includes(awardName.toLowerCase())
 				);
 			}
 			
 			if (this.instituteFilter) {
+				// Filter by institution ID or name
+				const instituteName = this.getInstitutionName(this.instituteFilter);
 				filtered = filtered.filter(entry => 
-					entry.institute.toLowerCase().includes(this.instituteFilter.toLowerCase())
+					entry.institution_id === this.instituteFilter ||
+					entry.institute.toLowerCase().includes(instituteName.toLowerCase())
 				);
 			}
 			
 			return filtered;
+		},
+		judgeName() {
+			// Format: "Mr. First Last" (title + first_name + last_name)
+			const parts = [];
+			
+			if (this.currentUser.title && this.currentUser.title.trim()) {
+				let title = this.currentUser.title.trim();
+				if (!title.endsWith('.')) {
+					title = title + '.';
+				}
+				parts.push(title);
+			}
+			
+			if (this.currentUser.first_name && this.currentUser.first_name.trim()) {
+				parts.push(this.currentUser.first_name.trim());
+			}
+			
+			if (this.currentUser.last_name && this.currentUser.last_name.trim()) {
+				parts.push(this.currentUser.last_name.trim());
+			}
+			
+			if (parts.length === 0) {
+				return this.currentUser.name || 'Judge';
+			}
+			
+			return parts.join(' ');
 		}
 	},
 	methods: {
+		async loadInstitutions() {
+			this.institutionsLoading = true;
+			try {
+				const response = await apiService.get('/judger/institutions');
+				if (response.success && response.data) {
+					this.institutions = Array.isArray(response.data) ? response.data : [];
+				} else {
+					this.institutions = [];
+					console.error('Failed to load institutions:', response);
+				}
+			} catch (error) {
+				console.error('Error loading institutions:', error);
+				this.institutions = [];
+				this.$message.error('Failed to load institutions');
+			} finally {
+				this.institutionsLoading = false;
+			}
+		},
+		async loadAwards() {
+			this.awardsLoading = true;
+			try {
+				// Load all awards (no institution filter for the filter dropdown)
+				const response = await apiService.get('/judger/awards');
+				if (response.success && response.data) {
+					this.awards = Array.isArray(response.data) ? response.data : [];
+				} else {
+					this.awards = [];
+					console.error('Failed to load awards:', response);
+				}
+			} catch (error) {
+				console.error('Error loading awards:', error);
+				this.awards = [];
+				this.$message.error('Failed to load award categories');
+			} finally {
+				this.awardsLoading = false;
+			}
+		},
+		async loadEvaluations() {
+			try {
+				const response = await apiService.get('/judger/evaluations', { limit: 100 });
+				if (response.success && response.data && response.data.data) {
+					// Map API data to summary format
+					this.summaryData = response.data.data.map(evaluation => ({
+						id: evaluation.id,
+						institution_id: evaluation.institution_id,
+						award_id: evaluation.award_id,
+						institute: evaluation.institution_name,
+						award: evaluation.award_category,
+						c1: evaluation.criteria_1_marks || 0,
+						c2: evaluation.criteria_2_marks || 0,
+						c3: evaluation.criteria_3_marks || 0,
+						c4: evaluation.criteria_4_marks || 0,
+						c5: evaluation.criteria_5_marks || 0,
+						presentation: evaluation.total_achieved_marks || evaluation.total_marks || 0,
+						overall: evaluation.aggregated_score || evaluation.total_marks || 0,
+						submittedDate: evaluation.created_at || evaluation.submitted_at
+					}));
+				}
+			} catch (error) {
+				console.error('Error loading evaluations:', error);
+				this.$message.error('Failed to load submission history');
+			}
+		},
+		getInstitutionName(id) {
+			if (typeof id === 'number' || !isNaN(id)) {
+				const institution = this.institutions.find(inst => inst.id == id);
+				return institution ? institution.name : id;
+			}
+			return id;
+		},
+		getAwardName(id) {
+			if (typeof id === 'number' || !isNaN(id)) {
+				const award = this.awards.find(a => a.id == id);
+				return award ? award.category : id;
+			}
+			return id;
+		},
 		selectRow(index) {
 			// Toggle selection - if clicking the same row, deselect it
 			if (this.selectedRowIndex === index) {
@@ -331,8 +427,9 @@ export default {
 						path: '/judger/evaluate',
 						query: { 
 							edit: 'true',
-							institute: submission.institute,
-							award: submission.award
+							id: submission.id,
+							institution_id: submission.institution_id,
+							award_id: submission.award_id
 						}
 					});
 				}
@@ -341,6 +438,23 @@ export default {
 		filterSummary() {
 			// Filter is handled by computed property
 		}
+	},
+	mounted() {
+		// Get current user info
+		const user = apiService.getCurrentUser();
+		if (user) {
+			this.currentUser = {
+				name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Judge',
+				title: user.title || null,
+				first_name: user.first_name || null,
+				last_name: user.last_name || null
+			};
+		}
+		
+		// Load data from API
+		this.loadInstitutions();
+		this.loadAwards();
+		this.loadEvaluations();
 	}
 }
 </script>

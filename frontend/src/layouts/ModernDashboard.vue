@@ -412,8 +412,8 @@ export default {
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
+  width: 50px;
+  height: 50px;
   background: #F1F5FF;
   border-radius: 50%;
   display: flex;
@@ -422,10 +422,13 @@ export default {
   color: #007BFF;
   overflow: hidden;
   flex-shrink: 0;
+  border: 2px solid #E5E7EB;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   
   &.has-image {
     background: transparent;
     padding: 0;
+    border-color: #3b82f6;
   }
   
   img {
@@ -437,8 +440,8 @@ export default {
   }
   
   svg {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
   }
 }
 
