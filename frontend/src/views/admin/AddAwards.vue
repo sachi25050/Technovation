@@ -201,7 +201,7 @@
 					</div>
 				</a-card>
 
-				<div style="margin-top: 24px;">
+				<div style="margin-top: 24px;margin-bottom: 24px;">
 					<a-button type="primary" @click="handleCreateAward" :loading="loading" size="large">
 						{{ isEditMode ? 'Update Award' : 'Create Award' }}
 					</a-button>

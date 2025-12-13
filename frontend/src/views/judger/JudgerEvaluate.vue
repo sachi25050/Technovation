@@ -89,10 +89,10 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 
 				<!-- Dynamic Marking Criteria Section -->
 				<div class="marking-criteria-section" v-if="selectedInstitute && selectedAward">
-					<h3 class="section-title">Marking Criteria</h3>
+
 					<div class="criteria-content">
 						<p><strong>Award Category:</strong> {{ getAwardName(selectedAward) }}</p>
-						<p><strong>Marking Criteria:</strong> Standard Evaluation Criteria for {{ getInstituteName(selectedInstitute) }}</p>
+						<p><strong>Description:</strong> {{ getAwardDescription(selectedAward) }}</p>
 					</div>
 				</div>
 
@@ -208,24 +208,24 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 						</div>
 					<div class="modern-action-buttons">
 						<div class="button-group left-group">
-							<button class="modern-btn btn-exit" @click="exitApplication">
+							<!-- <button class="modern-btn btn-exit" @click="exitApplication">
 								<span class="btn-icon">✖️</span>
 								<span class="btn-text">Exit</span>
-							</button>
-							<button class="modern-btn btn-delete" @click="deleteData">
+							</button> -->
+							<!-- <button class="modern-btn btn-delete" @click="deleteData">
 								<span class="btn-icon">🗑️</span>
 								<span class="btn-text">Delete</span>
-							</button>
+							</button> -->
 						</div>
 						<div class="button-group right-group">
-							<button class="modern-btn btn-remove-filter" @click="removeFilter">
+							<!-- <button class="modern-btn btn-remove-filter" @click="removeFilter">
 								<span class="btn-icon">📥</span>
 								<span class="btn-text">Remove Filter</span>
-							</button>
-							<button class="modern-btn btn-load" @click="loadData">
+							</button> -->
+							<!-- <button class="modern-btn btn-load" @click="loadData">
 								<span class="btn-icon">📥</span>
 								<span class="btn-text">Load</span>
-							</button>
+							</button> -->
 							<button class="modern-btn btn-reset" @click="resetForm">
 								<span class="btn-icon">🔄</span>
 								<span class="btn-text">Reset</span>
@@ -235,8 +235,8 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 								@click="submitMarks"
 								:disabled="!canSubmit"
 							>
-								<span class="btn-icon">📤</span>
-								<span class="btn-text">Submit</span>
+								<span class="btn-icon">{{ isEditMode ? '✏️' : '📤' }}</span>
+								<span class="btn-text">{{ isEditMode ? 'Update' : 'Submit' }}</span>
 							</button>
 						</div>
 					</div>
@@ -244,6 +244,13 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 
 				<!-- C. Filter Section -->
 				<div class="filter-section">
+					<div class="filter-header">
+						<div class="filter-header-spacer"></div>
+						<button class="filter-remove-btn" @click="removeFilter">
+							<span class="btn-icon">🗑️</span>
+							<span class="btn-text">Remove Filter</span>
+						</button>
+					</div>
 					<div class="filter-content">
 						<div class="filter-row">
 							<label>Award Category Filter</label>
@@ -288,6 +295,15 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 				<div class="summary-section">
 					<div class="summary-header">
 						<h6>{{ judgeName }} - Marking Sheet</h6>
+						<div class="summary-header-actions">
+							<button class="summary-delete-btn" @click="deleteSelectedRow" :disabled="selectedRowIndex === null">
+								<span class="btn-icon">🗑️</span>
+								<span class="btn-text">Delete</span>
+							</button>
+							<button class="summary-edit-btn" @click="editSelectedRow" :disabled="selectedRowIndex === null">
+								<span class="btn-text">Edit</span>
+							</button>
+						</div>
 					</div>
 					<div class="modern-table-wrapper">
 						<div class="table-container">
@@ -303,7 +319,6 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 										<th class="criteria-column">C-04</th>
 										<th class="criteria-column">C-05</th>
 										<th class="presentation-column">Presentation</th>
-										<th class="overall-column">Action</th>
 								</tr>
 							</thead>
 								<tbody class="table-body">
@@ -347,15 +362,6 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 												</div>
 											</div>
 										</td>
-										<td class="overall-cell">
-											<button 
-												class="edit-btn"
-												@click="editRow(index)"
-												:aria-label="`Edit entry for ${entry.institute}`"
-												title="Edit this entry">
-												Edit
-											</button>
-										</td>
 								</tr>
 							</tbody>
 						</table>
@@ -397,6 +403,11 @@ import apiService from '@/services/api'
 			selectedAward: null,
 			// Row selection state
 			selectedRowIndex: null,
+			
+			// Edit mode tracking
+			isEditMode: false,
+			editingEvaluationId: null,
+			existingEvaluation: null,
 			
 			// Weightage values
 			presentationWeightage: 0,
@@ -594,13 +605,23 @@ import apiService from '@/services/api'
 					this.loadAwardsForInstitution(this.selectedInstitute);
 				}
 			},
-			onAwardChange() {
+			async onAwardChange() {
+				// Reset edit mode when changing award
+				this.isEditMode = false;
+				this.editingEvaluationId = null;
+				this.existingEvaluation = null;
+				
 				// Reset marks when award changes
 				this.resetMarks();
 				// Fetch award data including weightages
 				this.fetchAwardWeightages();
 				// Fetch marking criteria for the selected award
 				this.fetchMarkingCriteria();
+				
+				// Check for existing evaluation (duplicate check)
+				if (this.selectedInstitute && this.selectedAward) {
+					await this.checkForDuplicate();
+				}
 			},
 		async fetchAwardWeightages() {
 			if (!this.selectedAward) {
@@ -691,7 +712,8 @@ import apiService from '@/services/api'
 				const totalMarks = this.totalMarks || 0;
 				const presentationWeightage = this.presentationWeightage || 0;
 				const presentationScore = totalMarks * (presentationWeightage / 100);
-				return presentationScore.toFixed(2);
+				// Round to whole number - presentation score must not be a decimal
+				return Math.round(presentationScore);
 			},
 			calculateVolumeWiseScore() {
 				// Calculate: preliminaryScore × (preliminaryWeightage / 100)
@@ -730,6 +752,87 @@ import apiService from '@/services/api'
 					});
 				}
 				this.updateTotal();
+			},
+			async checkForDuplicate() {
+				if (!this.selectedInstitute || !this.selectedAward) {
+					return;
+				}
+				
+				try {
+					const response = await apiService.get('/judger/evaluations', {
+						check_duplicate: true,
+						institution_id: this.selectedInstitute,
+						award_id: this.selectedAward
+					});
+					
+					if (response.success && response.data && response.data.exists) {
+						this.existingEvaluation = response.data.evaluation;
+						this.isEditMode = true;
+						this.editingEvaluationId = response.data.evaluation.id;
+						
+						// Show warning message
+						this.$warning({
+							title: 'Evaluation Already Exists',
+							content: 'You have already evaluated this. For further changes use edit option.',
+							okText: 'Edit Existing',
+							cancelText: 'Cancel',
+							onOk: () => {
+								// Load the existing evaluation data for editing
+								this.loadExistingEvaluation(response.data.evaluation.id);
+							},
+							onCancel: () => {
+								// Reset the form
+								this.selectedAward = null;
+								this.resetMarks();
+								this.isEditMode = false;
+								this.editingEvaluationId = null;
+								this.existingEvaluation = null;
+							}
+						});
+					} else {
+						this.existingEvaluation = null;
+						this.isEditMode = false;
+						this.editingEvaluationId = null;
+					}
+				} catch (error) {
+					console.error('Error checking for duplicate:', error);
+				}
+			},
+			async loadExistingEvaluation(evaluationId) {
+				try {
+					const response = await apiService.get(`/judger/evaluations/${evaluationId}`);
+					
+					if (response.success && response.data) {
+						const evaluation = response.data;
+						
+						// Set form fields from existing evaluation
+						this.presentationWeightage = parseFloat(evaluation.presentation_weightage) || 0;
+						this.preliminaryWeightage = parseFloat(evaluation.preliminary_weightage) || 0;
+						this.institutionMarks = parseFloat(evaluation.preliminary_score) || 0;
+						
+						// Load criteria marks if available
+						if (evaluation.criteria_marks && evaluation.criteria_marks.length > 0) {
+							evaluation.criteria_marks.forEach((mark, index) => {
+								if (this.markingCriteria[index]) {
+									this.markingCriteria[index].marks = parseFloat(mark.achieved_marks) || 0;
+								}
+							});
+						} else {
+							// Fallback to individual criteria columns
+							for (let i = 0; i < this.markingCriteria.length && i < 10; i++) {
+								const criteriaKey = `criteria_${i + 1}_marks`;
+								if (evaluation[criteriaKey] !== null) {
+									this.markingCriteria[i].marks = parseFloat(evaluation[criteriaKey]) || 0;
+								}
+							}
+						}
+						
+						this.$message.info('Loaded existing evaluation for editing');
+					}
+				} catch (error) {
+					console.error('Error loading existing evaluation:', error);
+					this.$message.error('Failed to load existing evaluation');
+				}
 			},
 			removeFilter() {
 				this.$confirm({
@@ -783,12 +886,110 @@ import apiService from '@/services/api'
 				if (score >= 60) return '60-69';
 				return '0-59';
 			},
-			editRow(index) {
-				// Handle edit button click
+			async editRow(index) {
 				const entry = this.filteredSummaryData[index];
-				this.$message.info(`Editing entry for ${entry.institute}`);
-				// In a real app, this would open an edit modal or navigate to edit page
-				console.log('Edit row:', index, entry);
+				
+				if (!entry) {
+					this.$message.error('Entry not found');
+					return;
+				}
+				
+				// Find the institution ID
+				const institution = this.institutions.find(inst => inst.name === entry.institute);
+				if (!institution) {
+					this.$message.error('Institution not found. Please reload the page.');
+					return;
+				}
+				
+				// Set the institution first
+				this.selectedInstitute = institution.id;
+				
+				// Load awards for the institution
+				await this.loadAwardsForInstitution(institution.id);
+				
+				// Find the award ID
+				const award = this.availableAwards.find(a => a.category === entry.award);
+				if (!award) {
+					this.$message.error('Award not found for this institution.');
+					return;
+				}
+				
+				// Set the award
+				this.selectedAward = award.id;
+				
+				// Set edit mode
+				this.isEditMode = true;
+				this.editingEvaluationId = entry.id;
+				
+				// Fetch award weightages and criteria
+				await this.fetchAwardWeightages();
+				await this.fetchMarkingCriteria();
+				
+				// Load the marks from the entry
+				if (this.markingCriteria.length >= 5) {
+					this.markingCriteria[0].marks = entry.c1 || 0;
+					this.markingCriteria[1].marks = entry.c2 || 0;
+					this.markingCriteria[2].marks = entry.c3 || 0;
+					this.markingCriteria[3].marks = entry.c4 || 0;
+					this.markingCriteria[4].marks = entry.c5 || 0;
+				}
+				
+				// If we have the evaluation ID, load full data from API
+				if (entry.id) {
+					await this.loadExistingEvaluation(entry.id);
+				}
+				
+				this.$message.info(`Editing evaluation for ${entry.institute}`);
+				
+				// Scroll to top for better UX
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			},
+			async editSelectedRow() {
+				if (this.selectedRowIndex !== null) {
+					await this.editRow(this.selectedRowIndex);
+				}
+			},
+			async deleteSelectedRow() {
+				if (this.selectedRowIndex === null) {
+					this.$message.warning('Please select a row to delete');
+					return;
+				}
+				
+				const entry = this.filteredSummaryData[this.selectedRowIndex];
+				this.$confirm({
+					title: 'Delete Entry',
+					content: `Are you sure you want to delete the evaluation for ${entry.institute} - ${entry.award}? This action cannot be undone.`,
+					okText: 'Yes, Delete',
+					cancelText: 'Cancel',
+					onOk: async () => {
+						try {
+							// If entry has an ID, delete from API
+							if (entry.id) {
+								const response = await apiService.delete(`/judger/evaluations/${entry.id}`);
+								
+								if (!response.success) {
+									this.$message.error(response.message || 'Failed to delete evaluation');
+									return;
+								}
+							}
+							
+							// Remove from local summaryData
+							const actualIndex = this.summaryData.findIndex(
+								item => (item.id && item.id === entry.id) || 
+								(item.institute === entry.institute && item.award === entry.award)
+							);
+							if (actualIndex !== -1) {
+								this.summaryData.splice(actualIndex, 1);
+							}
+							
+							this.selectedRowIndex = null;
+							this.$message.success('Evaluation deleted successfully');
+						} catch (error) {
+							console.error('Error deleting evaluation:', error);
+							this.$message.error('Failed to delete evaluation. Please try again.');
+						}
+					}
+				});
 			},
 			resetForm() {
 				this.$confirm({
@@ -811,6 +1012,10 @@ import apiService from '@/services/api'
 			this.presentationWeightage = 0;
 			this.preliminaryWeightage = 0;
 			this.institutionMarks = 0;
+			// Reset edit mode state
+			this.isEditMode = false;
+			this.editingEvaluationId = null;
+			this.existingEvaluation = null;
 		},
 			async submitMarks() {
 				if (!this.canSubmit) {
@@ -818,10 +1023,13 @@ import apiService from '@/services/api'
 					return;
 				}
 				
+				const actionTitle = this.isEditMode ? 'Update Marks' : 'Submit Marks';
+				const actionText = this.isEditMode ? 'update' : 'submit';
+				
 				this.$confirm({
-					title: 'Submit Marks',
-					content: `Are you sure you want to submit marks for ${this.getInstituteName(this.selectedInstitute)} - ${this.getAwardName(this.selectedAward)}?`,
-					okText: 'Submit',
+					title: actionTitle,
+					content: `Are you sure you want to ${actionText} marks for ${this.getInstituteName(this.selectedInstitute)} - ${this.getAwardName(this.selectedAward)}?`,
+					okText: this.isEditMode ? 'Update' : 'Submit',
 					cancelText: 'Cancel',
 					onOk: async () => {
 						try {
@@ -849,12 +1057,18 @@ import apiService from '@/services/api'
 								comments: ''
 							};
 							
-							// Submit to API
-							const response = await apiService.post('/judger/evaluations', evaluationData);
+							let response;
+							if (this.isEditMode && this.editingEvaluationId) {
+								// Update existing evaluation using PUT
+								response = await apiService.put(`/judger/evaluations/${this.editingEvaluationId}`, evaluationData);
+							} else {
+								// Create new evaluation using POST
+								response = await apiService.post('/judger/evaluations', evaluationData);
+							}
 							
 							if (response.success) {
-								// Add to local summary data for display
 								const newEntry = {
+									id: response.data?.id || this.editingEvaluationId,
 									institute: this.getInstituteName(this.selectedInstitute),
 									award: this.getAwardName(this.selectedAward),
 									c1: this.markingCriteria[0]?.marks || 0,
@@ -866,23 +1080,39 @@ import apiService from '@/services/api'
 									overall: parseFloat(this.calculateAggregateScore())
 								};
 								
-								this.summaryData.unshift(newEntry);
+								if (this.isEditMode) {
+									// Update existing entry in summaryData
+									const existingIndex = this.summaryData.findIndex(
+										item => item.id === this.editingEvaluationId ||
+										(item.institute === newEntry.institute && item.award === newEntry.award)
+									);
+									if (existingIndex !== -1) {
+										this.summaryData.splice(existingIndex, 1, newEntry);
+									}
+									this.$message.success(
+										`Marks successfully updated for ${newEntry.institute} – ${newEntry.award}`
+									);
+								} else {
+									// Add new entry to summaryData
+									this.summaryData.unshift(newEntry);
+									this.$message.success(
+										`Marks successfully submitted for ${newEntry.institute} – ${newEntry.award}`
+									);
+								}
 								
-								// Show success message
-								this.$message.success(
-									`Marks successfully submitted for ${newEntry.institute} – ${newEntry.award}`
-								);
-								
-								// Reset form (without confirmation)
+								// Reset form
 								this.selectedInstitute = null;
 								this.selectedAward = null;
 								this.resetMarks();
+								this.isEditMode = false;
+								this.editingEvaluationId = null;
+								this.existingEvaluation = null;
 							} else {
-								this.$message.error(response.message || 'Failed to submit evaluation');
+								this.$message.error(response.message || `Failed to ${actionText} evaluation`);
 							}
 						} catch (error) {
-							console.error('Error submitting evaluation:', error);
-							this.$message.error(error.message || 'Failed to submit evaluation. Please try again.');
+							console.error(`Error ${actionText}ing evaluation:`, error);
+							this.$message.error(error.message || `Failed to ${actionText} evaluation. Please try again.`);
 						}
 					}
 				});
@@ -948,6 +1178,14 @@ import apiService from '@/services/api'
 				'award-8': 'Award No. 8 - Best Digital Payment Security'
 			};
 			return awards[value] || value;
+		},
+		getAwardDescription(value) {
+			// If value is a number (ID), find award by ID and return its description
+			if (typeof value === 'number' || !isNaN(value)) {
+				const award = this.availableAwards.find(a => a.id == value);
+				return award ? (award.description || 'No description available') : '';
+			}
+			return '';
 		},
 		normalizeImageUrl(url) {
 			if (!url) return null;
@@ -1242,6 +1480,9 @@ import apiService from '@/services/api'
 }
 
 .summary-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
 	margin-bottom: 20px;
 	
 	@media (min-width: 768px) {
@@ -1252,7 +1493,7 @@ import apiService from '@/services/api'
 		margin-bottom: 28px;
 	}
 	
-	h3 {
+	h3, h6 {
 		font-size: 18px;
 		font-weight: 700;
 		color: #1E293B;
@@ -1266,6 +1507,67 @@ import apiService from '@/services/api'
 		@media (min-width: 1024px) {
 			font-size: 22px;
 		}
+	}
+}
+
+// Summary Header Actions (Delete & Edit buttons)
+.summary-header-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.summary-delete-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 12px;
+	background: #fee2e2;
+	border: 1px solid #fecaca;
+	border-radius: 4px;
+	color: #991b1b;
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	
+	&:hover:not(:disabled) {
+		background: #fecaca;
+		border-color: #fca5a5;
+	}
+	
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	
+	.btn-icon {
+		font-size: 12px;
+	}
+}
+
+.summary-edit-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 16px;
+	background: #10b981;
+	border: 1px solid #059669;
+	border-radius: 4px;
+	color: white;
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	
+	&:hover:not(:disabled) {
+		background: #059669;
+		border-color: #047857;
+	}
+	
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 }
 
@@ -2420,6 +2722,46 @@ import apiService from '@/services/api'
 	}
 }
 
+// Filter Header with Remove Filter Button
+.filter-header {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	margin-bottom: 12px;
+	
+	.filter-header-spacer {
+		flex: 1;
+	}
+}
+
+.filter-remove-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 14px;
+	background: #fca5a5;
+	border: 1px solid #f87171;
+	border-radius: 6px;
+	color: #991b1b;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	
+	&:hover {
+		background: #f87171;
+		border-color: #ef4444;
+	}
+	
+	.btn-icon {
+		font-size: 14px;
+	}
+	
+	.btn-text {
+		font-weight: 500;
+	}
+}
+
 .filter-content {
 	display: flex;
 	flex-direction: column;
@@ -2570,7 +2912,7 @@ import apiService from '@/services/api'
 	p {
 		margin: 6px 0;
 		color: #2C3E50;
-		font-size: 12px;
+		font-size: 14px;
 	}
 }
 

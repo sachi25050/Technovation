@@ -35,6 +35,39 @@ if ($action === 'submit' && $method === 'POST') {
 
 switch ($method) {
     case 'GET':
+        // Check for duplicate evaluation (used before submission)
+        if (isset($_GET['check_duplicate'])) {
+            $institutionId = isset($_GET['institution_id']) ? (int)$_GET['institution_id'] : null;
+            $awardId = isset($_GET['award_id']) ? (int)$_GET['award_id'] : null;
+            
+            if (!$institutionId || !$awardId) {
+                Response::error('Institution ID and Award ID are required');
+            }
+            
+            $checkStmt = $db->prepare("
+                SELECT e.id, e.status, e.created_at, e.submitted_at,
+                       i.name as institution_name,
+                       a.category as award_category
+                FROM evaluations e
+                JOIN institutions i ON e.institution_id = i.id
+                JOIN awards a ON e.award_id = a.id
+                WHERE e.judge_id = ? AND e.institution_id = ? AND e.award_id = ?
+            ");
+            $checkStmt->execute([$user['user_id'], $institutionId, $awardId]);
+            $existing = $checkStmt->fetch();
+            
+            if ($existing) {
+                Response::success('Duplicate found', [
+                    'exists' => true,
+                    'evaluation' => $existing,
+                    'message' => 'You have already evaluated this. For further changes use edit option.'
+                ]);
+            } else {
+                Response::success('No duplicate', ['exists' => false]);
+            }
+            exit;
+        }
+        
         if ($id) {
             // Get single evaluation with criteria marks
             $stmt = $db->prepare("
@@ -281,13 +314,13 @@ switch ($method) {
         break;
         
     case 'PUT':
-        // Update evaluation
+        // Update evaluation - allows updating submitted evaluations
         if (!$id) {
             Response::error('Evaluation ID is required');
         }
         
         // Check if evaluation belongs to this judge
-        $checkStmt = $db->prepare("SELECT id, status FROM evaluations WHERE id = ? AND judge_id = ?");
+        $checkStmt = $db->prepare("SELECT id, status, institution_id, award_id FROM evaluations WHERE id = ? AND judge_id = ?");
         $checkStmt->execute([$id, $user['user_id']]);
         $evaluation = $checkStmt->fetch();
         
@@ -295,89 +328,129 @@ switch ($method) {
             Response::notFound('Evaluation not found');
         }
         
-        if ($evaluation['status'] === 'submitted') {
-            Response::error('Cannot modify submitted evaluation', null, 400);
-        }
-        
         $criteriaMarks = $input['criteria_marks'] ?? [];
-        $comments = $input['comments'] ?? null;
+        $comments = $input['comments'] ?? '';
         
-        // Get award and criteria
-        $stmt = $db->prepare("
-            SELECT e.*, a.total_marks as award_total_marks
-            FROM evaluations e
-            JOIN awards a ON e.award_id = a.id
-            WHERE e.id = ?
-        ");
-        $stmt->execute([$id]);
-        $evalData = $stmt->fetch();
+        // Get scores from input
+        $presentationScore = isset($input['presentation_score']) ? (float)$input['presentation_score'] : 0;
+        $preliminaryScore = isset($input['preliminary_score']) ? (float)$input['preliminary_score'] : 0;
+        $aggregatedScore = isset($input['aggregated_score']) ? (float)$input['aggregated_score'] : 0;
+        $presentationWeightage = isset($input['presentation_weightage']) ? (float)$input['presentation_weightage'] : 0;
+        $preliminaryWeightage = isset($input['preliminary_weightage']) ? (float)$input['preliminary_weightage'] : 0;
+        $totalAchievedMarks = isset($input['total_achieved_marks']) ? (float)$input['total_achieved_marks'] : 0;
+        $totalAllocatedMarks = isset($input['total_allocated_marks']) ? (float)$input['total_allocated_marks'] : 0;
         
-        $stmt = $db->prepare("SELECT * FROM award_criteria WHERE award_id = ? ORDER BY display_order ASC");
-        $stmt->execute([$evalData['award_id']]);
-        $criteria = $stmt->fetchAll();
-        
-        // Validate and calculate marks
-        $totalAchieved = 0;
-        $totalAllocated = 0;
-        $marksData = [];
-        
-        foreach ($criteria as $criterion) {
-            $criterionId = $criterion['id'];
-            $allocated = (int)$criterion['allocated_marks'];
-            $achieved = 0;
-            
-            foreach ($criteriaMarks as $mark) {
-                if (isset($mark['criterion_id']) && $mark['criterion_id'] == $criterionId) {
-                    $achieved = (int)($mark['achieved_marks'] ?? 0);
-                    break;
-                }
+        // Prepare criteria columns (up to 10)
+        $criteriaValues = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $marks = null;
+            if (isset($criteriaMarks[$i - 1])) {
+                $marks = (float)($criteriaMarks[$i - 1]['achieved_marks'] ?? $criteriaMarks[$i - 1]['marks'] ?? null);
             }
-            
-            if ($achieved > $allocated) {
-                Response::validationError(['criteria_marks' => "Achieved marks cannot exceed allocated marks for criterion: {$criterion['name']}"]);
-            }
-            
-            $totalAchieved += $achieved;
-            $totalAllocated += $allocated;
-            $marksData[] = [
-                'criterion_id' => $criterionId,
-                'allocated_marks' => $allocated,
-                'achieved_marks' => $achieved
-            ];
+            $criteriaValues[] = $marks;
         }
         
-        $percentage = $totalAllocated > 0 ? ($totalAchieved / $totalAllocated) * 100 : 0;
+        // Calculate totals from criteria if not provided
+        if ($totalAchievedMarks == 0) {
+            foreach ($criteriaMarks as $mark) {
+                $totalAchievedMarks += (float)($mark['achieved_marks'] ?? $mark['marks'] ?? 0);
+            }
+        }
+        
+        // Calculate percentage
+        $percentage = $totalAllocatedMarks > 0 ? ($totalAchievedMarks / $totalAllocatedMarks) * 100 : 0;
         $percentage = round($percentage, 2);
         
         // Update evaluation
-        $updates = ["total_marks = ?", "percentage = ?"];
-        $params = [$totalAchieved, $percentage];
+        $sql = "UPDATE evaluations SET 
+            criteria_1_marks = ?, criteria_2_marks = ?, criteria_3_marks = ?, criteria_4_marks = ?, criteria_5_marks = ?,
+            criteria_6_marks = ?, criteria_7_marks = ?, criteria_8_marks = ?, criteria_9_marks = ?, criteria_10_marks = ?,
+            total_achieved_marks = ?, total_allocated_marks = ?, total_marks = ?, percentage = ?,
+            presentation_score = ?, preliminary_score = ?, aggregated_score = ?,
+            presentation_weightage = ?, preliminary_weightage = ?,
+            comments = ?, status = 'submitted', submitted_at = NOW(), updated_at = NOW()
+            WHERE id = ? AND judge_id = ?";
         
-        if ($comments !== null) {
-            $updates[] = "comments = ?";
-            $params[] = $comments;
-        }
+        $params = array_merge(
+            $criteriaValues,
+            [
+                $totalAchievedMarks, $totalAllocatedMarks, $totalAchievedMarks, $percentage,
+                $presentationScore, $preliminaryScore, $aggregatedScore,
+                $presentationWeightage, $preliminaryWeightage,
+                $comments, $id, $user['user_id']
+            ]
+        );
         
-        $params[] = $id;
-        $sql = "UPDATE evaluations SET " . implode(', ', $updates) . " WHERE id = ?";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         
-        // Update criteria marks
+        // Delete old criteria marks from normalized table
         $deleteStmt = $db->prepare("DELETE FROM evaluation_criteria_marks WHERE evaluation_id = ?");
         $deleteStmt->execute([$id]);
         
-        $marksStmt = $db->prepare("INSERT INTO evaluation_criteria_marks (evaluation_id, criterion_id, allocated_marks, achieved_marks) VALUES (?, ?, ?, ?)");
-        foreach ($marksData as $mark) {
-            $marksStmt->execute([$id, $mark['criterion_id'], $mark['allocated_marks'], $mark['achieved_marks']]);
+        // Insert updated criteria marks
+        $marksStmt = $db->prepare("INSERT INTO evaluation_criteria_marks 
+            (evaluation_id, criterion_id, criterion_name, display_order, allocated_marks, achieved_marks) 
+            VALUES (?, ?, ?, ?, ?, ?)");
+        
+        foreach ($criteriaMarks as $index => $mark) {
+            $criterionId = isset($mark['criterion_id']) ? (int)$mark['criterion_id'] : ($index + 1);
+            $criterionName = $mark['name'] ?? $mark['criterion_name'] ?? "Criterion " . ($index + 1);
+            $displayOrder = $index + 1;
+            $allocatedMarks = (float)($mark['allocated_marks'] ?? $mark['allocated'] ?? 0);
+            $achievedMarks = (float)($mark['achieved_marks'] ?? $mark['marks'] ?? 0);
+            
+            $marksStmt->execute([
+                $id, $criterionId, $criterionName, $displayOrder, $allocatedMarks, $achievedMarks
+            ]);
         }
         
-        // Get updated evaluation
-        $stmt = $db->prepare("SELECT * FROM evaluations WHERE id = ?");
+        // Get updated evaluation with related data
+        $stmt = $db->prepare("
+            SELECT e.*, 
+                   i.name as institution_name,
+                   a.category as award_category,
+                   CONCAT(COALESCE(u.title, ''), ' ', COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as judge_name
+            FROM evaluations e
+            JOIN institutions i ON e.institution_id = i.id
+            JOIN awards a ON e.award_id = a.id
+            JOIN users u ON e.judge_id = u.id
+            WHERE e.id = ?
+        ");
         $stmt->execute([$id]);
         $updatedEvaluation = $stmt->fetch();
         
         Response::success('Evaluation updated successfully', $updatedEvaluation);
+        break;
+    
+    case 'DELETE':
+        // Delete evaluation
+        if (!$id) {
+            Response::error('Evaluation ID is required');
+        }
+        
+        // Check if evaluation belongs to this judge
+        $checkStmt = $db->prepare("SELECT id, institution_id, award_id FROM evaluations WHERE id = ? AND judge_id = ?");
+        $checkStmt->execute([$id, $user['user_id']]);
+        $evaluation = $checkStmt->fetch();
+        
+        if (!$evaluation) {
+            Response::notFound('Evaluation not found');
+        }
+        
+        // Delete criteria marks first (cascades should handle this, but explicit is safer)
+        $deleteMarksStmt = $db->prepare("DELETE FROM evaluation_criteria_marks WHERE evaluation_id = ?");
+        $deleteMarksStmt->execute([$id]);
+        
+        // Delete the evaluation
+        $deleteStmt = $db->prepare("DELETE FROM evaluations WHERE id = ? AND judge_id = ?");
+        $deleteStmt->execute([$id, $user['user_id']]);
+        
+        if ($deleteStmt->rowCount() === 0) {
+            Response::error('Failed to delete evaluation');
+        }
+        
+        Response::success('Evaluation deleted successfully', ['id' => $id]);
         break;
         
     default:

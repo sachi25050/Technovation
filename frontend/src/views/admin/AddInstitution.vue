@@ -131,7 +131,7 @@
 									<a-col :span="6">
 										<a-input-number
 											v-model="award.marks"
-											placeholder="Marks"
+											placeholder="Preliminary Marks"
 											style="width: 100%"
 											:min="0"
 											:max="1000"
