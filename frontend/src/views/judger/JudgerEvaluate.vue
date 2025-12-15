@@ -19,6 +19,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 						<div class="institution-image-container">
 							<div class="institution-image-wrapper" v-if="selectedInstitutionImage">
 								<img 
+									:key="selectedInstitute + '-' + selectedInstitutionImage"
 									:src="selectedInstitutionImage" 
 									:alt="getInstituteName(selectedInstitute)"
 									class="institution-image"
@@ -45,6 +46,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 									placeholder="Select Institute" 
 									@change="onInstituteChange"
 									:loading="institutionsLoading"
+									:getPopupContainer="triggerNode => triggerNode.parentNode"
 								>
 									<a-select-option 
 										v-for="institution in institutions" 
@@ -65,6 +67,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 									@change="onAwardChange"
 									:loading="awardsLoading"
 									:disabled="!selectedInstitute"
+									:getPopupContainer="triggerNode => triggerNode.parentNode"
 								>
 									<a-select-option 
 										v-for="award in availableAwards" 
@@ -254,39 +257,41 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 					<div class="filter-content">
 						<div class="filter-row">
 							<label>Award Category Filter</label>
-							<a-select 
-								v-model="categoryFilter" 
-								placeholder="Select Award Category"
-								class="filter-select award-filter-full"
-								@change="filterSummary"
+						<a-select 
+							v-model="categoryFilter" 
+							placeholder="Select Award Category"
+							class="filter-select award-filter-full"
+							@change="filterSummary"
+							:getPopupContainer="triggerNode => triggerNode.parentNode"
+						>
+							<a-select-option value="">All Categories</a-select-option>
+							<a-select-option 
+								v-for="award in availableAwards" 
+								:key="award.id" 
+								:value="award.id"
 							>
-								<a-select-option value="">All Categories</a-select-option>
-								<a-select-option 
-									v-for="award in availableAwards" 
-									:key="award.id" 
-									:value="award.id"
-								>
-									{{ award.category }}
-								</a-select-option>
-							</a-select>
+								{{ award.category }}
+							</a-select-option>
+						</a-select>
 						</div>
 						<div class="filter-row">
 							<label>Institute Filter</label>
-							<a-select 
-								v-model="instituteFilter" 
-								placeholder="Select Institute"
-								class="filter-select institute-filter-full"
-								@change="filterSummary"
+						<a-select 
+							v-model="instituteFilter" 
+							placeholder="Select Institute"
+							class="filter-select institute-filter-full"
+							@change="filterSummary"
+							:getPopupContainer="triggerNode => triggerNode.parentNode"
+						>
+							<a-select-option value="">All Institutes</a-select-option>
+							<a-select-option 
+								v-for="institution in institutions" 
+								:key="institution.id" 
+								:value="institution.id"
 							>
-								<a-select-option value="">All Institutes</a-select-option>
-								<a-select-option 
-									v-for="institution in institutions" 
-									:key="institution.id" 
-									:value="institution.id"
-								>
-									{{ institution.name }}
-								</a-select-option>
-							</a-select>
+								{{ institution.name }}
+							</a-select-option>
+						</a-select>
 						</div>
 					</div>
 				</div>
@@ -477,9 +482,13 @@ import apiService from '@/services/api'
 			selectedInstitutionImage() {
 				if (!this.selectedInstitute) return null;
 				const institution = this.institutions.find(inst => inst.id === this.selectedInstitute);
+				console.log('Selected institution:', institution);
 				if (institution && institution.image_url) {
-					return this.normalizeImageUrl(institution.image_url);
+					const url = this.normalizeImageUrl(institution.image_url);
+					console.log('Institution image URL:', url);
+					return url;
 				}
+				console.log('No image_url found for institution');
 				return null;
 			},
 			filteredSummaryData() {
@@ -1254,24 +1263,47 @@ import apiService from '@/services/api'
 			
 			const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
 			
+			// If it's already a full URL with /api/uploads/, return as is
+			if (url.includes('/api/uploads/')) {
+				console.log('Image URL (already normalized):', url);
+				return url;
+			}
+			
 			// Extract the file path from various URL formats
 			let filePath = url;
 			
 			// If it's a full URL, extract the path after /uploads/
-			if (url.includes('/uploads/')) {
+			if (url.includes('/backend/uploads/')) {
+				const uploadsIndex = url.indexOf('/backend/uploads/');
+				filePath = url.substring(uploadsIndex + '/backend/uploads/'.length);
+			} else if (url.includes('/uploads/')) {
 				const uploadsIndex = url.indexOf('/uploads/');
 				filePath = url.substring(uploadsIndex + '/uploads/'.length);
+			} else if (url.startsWith('http')) {
+				// Full URL but without /uploads/, try to extract filename
+				const lastSlash = url.lastIndexOf('/');
+				filePath = 'institutions/' + url.substring(lastSlash + 1);
 			} else if (url.startsWith('/')) {
 				filePath = url.substring(1);
 			}
 			
-			// Use the API uploads endpoint with path parameter
-			return `${apiBaseUrl}/uploads?path=${encodeURIComponent(filePath)}`;
+			// Remove 'uploads/' prefix if present
+			if (filePath.startsWith('uploads/')) {
+				filePath = filePath.substring(8);
+			}
+			
+			// Use the API uploads endpoint with path segments
+			// Format: /api/uploads/{subfolder}/{filename}
+			const finalUrl = `${apiBaseUrl}/uploads/${filePath}`;
+			console.log('Image URL normalized:', url, '->', finalUrl);
+			return finalUrl;
 		},
 		handleInstitutionImageError(event) {
-			// Hide the broken image and show placeholder
-			event.target.style.display = 'none';
-			console.error('Failed to load institution image');
+			// Log the failed URL for debugging
+			console.error('Institution image failed to load:', event.target.src);
+			// Show default institution icon on error
+			event.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Cpath fill='%239ca3af' d='M50 20L20 35v5h60v-5L50 20zM25 45v30h10V55h10v20h10V55h10v20h10V45H25zM15 80h70v5H15v-5z'/%3E%3C/svg%3E";
+			event.target.onerror = null; // Prevent infinite loop
 		},
 		async loadEvaluations() {
 			try {
