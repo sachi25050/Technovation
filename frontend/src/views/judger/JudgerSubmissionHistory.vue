@@ -18,13 +18,14 @@
 					<div class="filter-content">
 						<div class="filter-row">
 							<label>Institute Filter</label>
-							<a-select 
-								v-model="instituteFilter" 
-								placeholder="Select Institute"
-								class="filter-select institute-filter-full"
-								@change="filterSummary"
-								:loading="institutionsLoading"
-							>
+						<a-select 
+							v-model="instituteFilter" 
+							placeholder="Select Institute"
+							class="filter-select institute-filter-full"
+							@change="filterSummary"
+							:loading="institutionsLoading"
+							:getPopupContainer="triggerNode => triggerNode.parentNode"
+						>
 								<a-select-option value="">All Institutes</a-select-option>
 								<a-select-option 
 									v-for="institution in institutions" 
@@ -38,13 +39,14 @@
 						<div class="filter-row">
 							
 							<label>Award Category Filter</label>
-							<a-select 
-								v-model="categoryFilter" 
-								placeholder="Select Award Category"
-								class="filter-select award-filter-full"
-								@change="filterSummary"
-								:loading="awardsLoading"
-							>
+						<a-select 
+							v-model="categoryFilter" 
+							placeholder="Select Award Category"
+							class="filter-select award-filter-full"
+							@change="filterSummary"
+							:loading="awardsLoading"
+							:getPopupContainer="triggerNode => triggerNode.parentNode"
+						>
 								<a-select-option value="">All Categories</a-select-option>
 								<a-select-option 
 									v-for="award in awards" 

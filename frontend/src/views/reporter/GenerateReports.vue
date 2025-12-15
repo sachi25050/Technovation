@@ -22,38 +22,40 @@
 						<a-row :gutter="16">
 							<a-col :span="12">
 								<a-form-item label="Report Type">
-									<a-select
-										v-decorator="[
-											'reportType',
-											{
-												rules: [{ required: true, message: 'Please select report type!' }]
-											}
-										]"
-										placeholder="Select report type"
-										@change="onReportTypeChange"
-									>
-										<a-select-option value="award-marks">Award Marks Report</a-select-option>
-										<a-select-option value="institution-performance">Institution Performance</a-select-option>
-										<a-select-option value="judge-evaluation">Judge Evaluation Summary</a-select-option>
-										<a-select-option value="detailed-analysis">Detailed Analysis</a-select-option>
-									</a-select>
+								<a-select
+									v-decorator="[
+										'reportType',
+										{
+											rules: [{ required: true, message: 'Please select report type!' }]
+										}
+									]"
+									placeholder="Select report type"
+									@change="onReportTypeChange"
+									:getPopupContainer="triggerNode => triggerNode.parentNode"
+								>
+									<a-select-option value="award-marks">Award Marks Report</a-select-option>
+									<a-select-option value="institution-performance">Institution Performance</a-select-option>
+									<a-select-option value="judge-evaluation">Judge Evaluation Summary</a-select-option>
+									<a-select-option value="detailed-analysis">Detailed Analysis</a-select-option>
+								</a-select>
 								</a-form-item>
 							</a-col>
 							<a-col :span="12">
 								<a-form-item label="Report Format">
-									<a-select
-										v-decorator="[
-											'reportFormat',
-											{
-												rules: [{ required: true, message: 'Please select report format!' }]
-											}
-										]"
-										placeholder="Select format"
-									>
-										<a-select-option value="pdf">PDF</a-select-option>
-										<a-select-option value="excel">Excel</a-select-option>
-										<a-select-option value="csv">CSV</a-select-option>
-									</a-select>
+								<a-select
+									v-decorator="[
+										'reportFormat',
+										{
+											rules: [{ required: true, message: 'Please select report format!' }]
+										}
+									]"
+									placeholder="Select format"
+									:getPopupContainer="triggerNode => triggerNode.parentNode"
+								>
+									<a-select-option value="pdf">PDF</a-select-option>
+									<a-select-option value="excel">Excel</a-select-option>
+									<a-select-option value="csv">CSV</a-select-option>
+								</a-select>
 								</a-form-item>
 							</a-col>
 						</a-row>
@@ -69,6 +71,7 @@
 								mode="multiple"
 								placeholder="Select awards to include in report"
 								style="width: 100%"
+								:getPopupContainer="triggerNode => triggerNode.parentNode"
 							>
 								<a-select-option value="innovation-excellence">Innovation Excellence Award</a-select-option>
 								<a-select-option value="academic-achievement">Academic Achievement Award</a-select-option>
@@ -82,18 +85,19 @@
 						<a-row :gutter="16">
 							<a-col :span="12">
 								<a-form-item label="Filter by Institution">
-									<a-select
-										v-decorator="['institutionFilter']"
-										placeholder="Select institution (optional)"
-										allowClear
-									>
-										<a-select-option value="university-1">University of Colombo</a-select-option>
-										<a-select-option value="university-2">University of Peradeniya</a-select-option>
-										<a-select-option value="university-3">University of Moratuwa</a-select-option>
-										<a-select-option value="university-4">University of Kelaniya</a-select-option>
-										<a-select-option value="college-1">Sri Lanka Institute of Technology</a-select-option>
-										<a-select-option value="school-1">Colombo International School</a-select-option>
-									</a-select>
+								<a-select
+									v-decorator="['institutionFilter']"
+									placeholder="Select institution (optional)"
+									allowClear
+									:getPopupContainer="triggerNode => triggerNode.parentNode"
+								>
+									<a-select-option value="university-1">University of Colombo</a-select-option>
+									<a-select-option value="university-2">University of Peradeniya</a-select-option>
+									<a-select-option value="university-3">University of Moratuwa</a-select-option>
+									<a-select-option value="university-4">University of Kelaniya</a-select-option>
+									<a-select-option value="college-1">Sri Lanka Institute of Technology</a-select-option>
+									<a-select-option value="school-1">Colombo International School</a-select-option>
+								</a-select>
 								</a-form-item>
 							</a-col>
 							<a-col :span="12">

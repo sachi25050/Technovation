@@ -210,9 +210,9 @@ export default {
       return imageUrl;
     },
     handleImageError(event) {
-      // Hide broken image and show default avatar
-      event.target.style.display = 'none';
-      this.currentUser.profile_image = null;
+      // Show default user avatar on error
+      event.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M20 85c0-22 13-30 30-30s30 8 30 30' fill='%239ca3af'/%3E%3C/svg%3E";
+      event.target.onerror = null; // Prevent infinite loop
     }
   },
   mounted() {
@@ -249,8 +249,11 @@ export default {
 .modern-dashboard {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
   background: #FFFFFF;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
 }
 
 .main-content {
@@ -258,11 +261,14 @@ export default {
   margin-left: 280px;
   display: flex;
   flex-direction: column;
-  transition: margin-left 0.3s ease;
+  min-width: 0;
+  width: calc(100% - 280px);
+  transition: margin-left 0.3s ease, width 0.3s ease;
 }
 
 .main-content.sidebar-collapsed {
   margin-left: 80px;
+  width: calc(100% - 80px);
 }
 
 /* Header */
@@ -276,6 +282,8 @@ export default {
   position: sticky;
   top: 0;
   z-index: 100;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .header-left {
@@ -470,6 +478,8 @@ export default {
   padding: 24px;
   background: #F9FAFB;
   min-height: calc(100vh - 140px);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Footer */
@@ -477,6 +487,8 @@ export default {
   background: #FFFFFF;
   border-top: 1px solid #E5E7EB;
   padding: 16px 24px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .footer-content {
@@ -505,10 +517,12 @@ export default {
 @media (max-width: 1024px) {
   .main-content {
     margin-left: 0;
+    width: 100%;
   }
   
   .main-content.sidebar-collapsed {
     margin-left: 0;
+    width: 100%;
   }
   
   .mobile-overlay {
@@ -517,6 +531,7 @@ export default {
   
   .dashboard-header {
     padding: 16px 20px;
+    width: 100%;
   }
   
   .page-content {

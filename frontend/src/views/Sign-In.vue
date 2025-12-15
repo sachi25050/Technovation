@@ -14,7 +14,7 @@
 
 				<div class="card-header">
 					<h1 class="card-title">Sign In</h1>
-					<p class="card-subtitle">Technnovation Judging System</p>
+					<h6 class="">Technnovation Judging System</h6>
 				</div>
 
 				<!-- Error Message -->

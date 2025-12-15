@@ -222,22 +222,22 @@
 						</a-col>
 						<a-col :span="12">
 							<div class="stat-item">
-								<div class="stat-value">{{ awardStats.active }}</div>
-								<div class="stat-label">Active</div>
+								<div class="stat-value">{{ awardStats.totalCriteria }}</div>
+								<div class="stat-label">Total Criteria</div>
 							</div>
 						</a-col>
 					</a-row>
 					<a-row :gutter="16" style="margin-top: 16px;">
 						<a-col :span="12">
 							<div class="stat-item">
-								<div class="stat-value">{{ awardStats.completed }}</div>
-								<div class="stat-label">Completed</div>
+								<div class="stat-value">N/A</div>
+								<div class="stat-label">N/A</div>
 							</div>
 						</a-col>
 						<a-col :span="12">
 							<div class="stat-item">
-								<div class="stat-value">{{ awardStats.pending }}</div>
-								<div class="stat-label">Pending</div>
+								<div class="stat-value">N/A</div>
+								<div class="stat-label">N/A</div>
 							</div>
 						</a-col>
 					</a-row>
@@ -312,13 +312,7 @@
 				},
 				awardTableColumns: [
 					{
-						title: 'Award Number',
-						dataIndex: 'award_number',
-						key: 'award_number',
-						width: 120
-					},
-					{
-						title: 'Category',
+						title: 'Award Category',
 						dataIndex: 'category',
 						key: 'category',
 						width: 250
@@ -366,9 +360,7 @@
 				recentAwards: [],
 				awardStats: {
 					total: 0,
-					active: 0,
-					completed: 0,
-					pending: 0
+					totalCriteria: 0
 				},
 				presentationWeightage: 0,
 				preliminaryWeightage: 0
@@ -619,11 +611,17 @@
 						return;
 					}
 					
+					// Count total criteria across all awards
+					let totalCriteria = 0;
+					awards.forEach(award => {
+						if (award.criteria && Array.isArray(award.criteria)) {
+							totalCriteria += award.criteria.length;
+						}
+					});
+					
 					this.awardStats = {
 						total: awards.length,
-						active: awards.length, // You can add status field later
-						completed: 0,
-						pending: 0
+						totalCriteria: totalCriteria
 					};
 				} catch (error) {
 					console.error('Failed to load award stats:', error);

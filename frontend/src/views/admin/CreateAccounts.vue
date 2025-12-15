@@ -22,14 +22,15 @@
 						<a-row :gutter="16">
 							<a-col :span="24" :md="6">
 								<a-form-item label="Title">
-									<a-select
-										v-decorator="['title']"
-										placeholder="Select title"
-									>
-										<a-select-option value="Mr">Mr</a-select-option>
-										<a-select-option value="Mrs">Mrs</a-select-option>
-										<a-select-option value="Ms">Ms</a-select-option>
-									</a-select>
+								<a-select
+									v-decorator="['title']"
+									placeholder="Select title"
+									:getPopupContainer="triggerNode => triggerNode.parentNode"
+								>
+									<a-select-option value="Mr">Mr</a-select-option>
+									<a-select-option value="Mrs">Mrs</a-select-option>
+									<a-select-option value="Ms">Ms</a-select-option>
+								</a-select>
 								</a-form-item>
 							</a-col>
 							<a-col :span="24" :md="9">
@@ -87,19 +88,20 @@
 						<a-row :gutter="16">
 							<a-col :span="24" :md="12">
 								<a-form-item label="Role">
-									<a-select
-										v-decorator="[
-											'role',
-											{
-												rules: [{ required: true, message: 'Please select a role!' }]
-											}
-										]"
-										placeholder="Select user role"
-									>
-										<a-select-option value="admin">Admin</a-select-option>
-										<a-select-option value="judger">Judger</a-select-option>
-										<a-select-option value="reporter">Reporter</a-select-option>
-									</a-select>
+								<a-select
+									v-decorator="[
+										'role',
+										{
+											rules: [{ required: true, message: 'Please select a role!' }]
+										}
+									]"
+									placeholder="Select user role"
+									:getPopupContainer="triggerNode => triggerNode.parentNode"
+								>
+									<a-select-option value="admin">Admin</a-select-option>
+									<a-select-option value="judger">Judger</a-select-option>
+									<a-select-option value="reporter">Reporter</a-select-option>
+								</a-select>
 								</a-form-item>
 							</a-col>
 							<a-col :span="24" :md="12">
@@ -420,8 +422,9 @@
 					}
 				}
 				
-				// If still fails, hide the broken image
-				event.target.style.display = 'none';
+				// If still fails, show default user icon
+				event.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M20 85c0-22 13-30 30-30s30 8 30 30' fill='%239ca3af'/%3E%3C/svg%3E";
+				event.target.onerror = null; // Prevent infinite loop
 			},
 			handleTableImageLoad(event) {
 				// Image loaded successfully in table
@@ -503,14 +506,19 @@
 		normalizeImageUrl(imageUrl) {
 			if (!imageUrl) return null;
 			
+			// If already using /api/uploads/ format, return as is
+			if (imageUrl.includes('/api/uploads/')) {
+				return imageUrl;
+			}
+			
 			// Convert to API endpoint URL if it's a backend/uploads path
 			if (imageUrl.includes('/backend/uploads/')) {
 				// Extract the relative path (e.g., users/filename.jpg)
 				const pathMatch = imageUrl.match(/\/backend\/uploads\/(.+)$/);
 				if (pathMatch && pathMatch[1]) {
-					// Use the API uploads endpoint
+					// Use the API uploads endpoint with path segments
 					const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
-					return `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+					return `${apiBaseUrl}/uploads/${pathMatch[1]}`;
 				}
 			}
 			
@@ -621,7 +629,7 @@
 						if (user.profile_image.includes('/backend/uploads/')) {
 							const pathMatch = user.profile_image.match(/\/backend\/uploads\/(.+)$/);
 							if (pathMatch && pathMatch[1]) {
-								this.imageUrl = `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+								this.imageUrl = `${apiBaseUrl}/uploads/${pathMatch[1]}`;
 							} else {
 								this.imageUrl = user.profile_image;
 							}

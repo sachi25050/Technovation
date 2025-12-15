@@ -17,7 +17,7 @@ if (file_exists(__DIR__ . '/../.env')) {
 return [
     'app_name' => 'Technovation e-Judging System',
     'app_version' => '1.0.0',
-    'app_url' => $_ENV['APP_URL'] ?? 'http://localhost',
+    'app_url' => $_ENV['APP_URL'] ?? 'http://localhost:8000',
     
     // JWT Configuration
     'jwt_secret' => $_ENV['JWT_SECRET'] ?? 'your-secret-key-change-in-production',
@@ -25,7 +25,7 @@ return [
     
     // File Upload Configuration
     'upload_path' => __DIR__ . '/../uploads/',
-    'upload_url' => ($_ENV['APP_URL'] ?? 'http://localhost:8000') . '/backend/uploads/',
+    'upload_url' => ($_ENV['APP_URL'] ?? 'http://localhost:8000') . '/api/uploads/',
     'max_file_size' => 2048 * 1024, // 2MB
     'allowed_image_types' => ['image/jpeg', 'image/png', 'image/jpg'],
     

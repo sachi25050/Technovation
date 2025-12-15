@@ -103,6 +103,7 @@
 								placeholder="Select award categories"
 								style="width: 100%"
 								:loading="awardsLoading"
+								:getPopupContainer="triggerNode => triggerNode.parentNode"
 							>
 								<a-select-option 
 									v-for="award in availableAwards" 
@@ -180,22 +181,22 @@
 						</a-col>
 						<a-col :span="12">
 							<div class="stat-item">
-								<div class="stat-value">{{ institutionStats.universities }}</div>
-								<div class="stat-label">Universities</div>
+								<div class="stat-value">{{ institutionStats.institutes }}</div>
+								<div class="stat-label">Institutes</div>
 							</div>
 						</a-col>
 					</a-row>
 					<a-row :gutter="16" style="margin-top: 16px;">
 						<a-col :span="12">
 							<div class="stat-item">
-								<div class="stat-value">{{ institutionStats.colleges }}</div>
-								<div class="stat-label">Colleges</div>
+								<div class="stat-value">{{ institutionStats.awards }}</div>
+								<div class="stat-label">Awards</div>
 							</div>
 						</a-col>
 						<a-col :span="12">
 							<div class="stat-item">
-								<div class="stat-value">{{ institutionStats.schools }}</div>
-								<div class="stat-label">Schools</div>
+								<div class="stat-value">N/A</div>
+								<div class="stat-label">N/A</div>
 							</div>
 						</a-col>
 					</a-row>
@@ -323,9 +324,8 @@
 				awardsLoading: false,
 				institutionStats: {
 					total: 0,
-					universities: 0,
-					colleges: 0,
-					schools: 0
+					institutes: 0,
+					awards: 0
 				}
 			}
 		},
@@ -490,14 +490,19 @@
 			normalizeImageUrl(imageUrl) {
 				if (!imageUrl) return null;
 				
+				// If already using /api/uploads/ format, return as is
+				if (imageUrl.includes('/api/uploads/')) {
+					return imageUrl;
+				}
+				
 				// Convert to API endpoint URL if it's a backend/uploads path
 				if (imageUrl.includes('/backend/uploads/')) {
 					// Extract the relative path (e.g., institutions/filename.jpg)
 					const pathMatch = imageUrl.match(/\/backend\/uploads\/(.+)$/);
 					if (pathMatch && pathMatch[1]) {
-						// Use the API uploads endpoint
+						// Use the API uploads endpoint with path segments
 						const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
-						return `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+						return `${apiBaseUrl}/uploads/${pathMatch[1]}`;
 					}
 				}
 				
@@ -584,11 +589,18 @@
 					return;
 				}
 				
+				// Count total awards across all institutions
+				let totalAwards = 0;
+				institutions.forEach(inst => {
+					if (inst.awards && Array.isArray(inst.awards)) {
+						totalAwards += inst.awards.length;
+					}
+				});
+				
 				this.institutionStats = {
 					total: institutions.length,
-					universities: institutions.length,
-					colleges: 0,
-					schools: 0
+					institutes: institutions.length,
+					awards: totalAwards
 				};
 			} catch (error) {
 				console.error('Failed to load institution stats:', error);
@@ -843,8 +855,9 @@
 					}
 				}
 				
-				// If still fails, hide the broken image
-				event.target.style.display = 'none';
+				// If still fails, show default institution icon
+				event.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Cpath fill='%239ca3af' d='M50 20L20 35v5h60v-5L50 20zM25 45v30h10V55h10v20h10V55h10v20h10V45H25zM15 80h70v5H15v-5z'/%3E%3C/svg%3E";
+				event.target.onerror = null; // Prevent infinite loop
 			},
 			handleTableImageLoad(event) {
 				// Image loaded successfully in table

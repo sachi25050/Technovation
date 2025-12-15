@@ -18,6 +18,47 @@ if (strpos($uri, 'institutions') !== false) {
     $stmt = $db->query("SELECT id, name, type, image_url FROM institutions WHERE status = 'active' ORDER BY name ASC");
     $institutions = $stmt->fetchAll();
     
+    $config = require __DIR__ . '/../../../config/config.php';
+    $uploadBaseUrl = rtrim($config['upload_url'], '/');
+    
+    // Fix image URLs - ensure they are proper full URLs
+    foreach ($institutions as &$inst) {
+        if (!empty($inst['image_url'])) {
+            $url = $inst['image_url'];
+            
+            // If it's already a full URL with the correct /api/uploads/ path, use it
+            if (strpos($url, '/api/uploads/') !== false) {
+                // Already correct format, just ensure full URL
+                if (strpos($url, 'http') !== 0) {
+                    // Extract path after /api/uploads/
+                    $pathStart = strpos($url, '/api/uploads/') + 13;
+                    $url = $uploadBaseUrl . '/' . substr($url, $pathStart);
+                }
+            } elseif (strpos($url, 'http') === 0) {
+                // Full URL but old format - extract filename and rebuild
+                // Convert old /backend/uploads/ to new format
+                if (strpos($url, '/backend/uploads/') !== false) {
+                    $pathStart = strpos($url, '/backend/uploads/') + 17;
+                    $url = $uploadBaseUrl . '/' . substr($url, $pathStart);
+                } elseif (strpos($url, '/uploads/') !== false) {
+                    $pathStart = strpos($url, '/uploads/') + 9;
+                    $url = $uploadBaseUrl . '/' . substr($url, $pathStart);
+                }
+            } else {
+                // It's a relative path, construct full URL
+                $url = ltrim($url, '/');
+                // Remove 'uploads/' prefix if present
+                if (strpos($url, 'uploads/') === 0) {
+                    $url = substr($url, 8);
+                }
+                // Build full API URL
+                $url = $uploadBaseUrl . '/' . $url;
+            }
+            
+            $inst['image_url'] = $url;
+        }
+    }
+    
     Response::success('Institutions retrieved', $institutions);
     
 } elseif (strpos($uri, 'awards') !== false) {

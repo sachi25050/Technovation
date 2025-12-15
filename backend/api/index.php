@@ -88,8 +88,8 @@ $routes = [
     // Reporter - Data
     'GET /reporter/data' => 'reporter/data.php',
     
-    // Uploads - Serve uploaded files
-    'GET /uploads' => 'uploads.php',
+    // Uploads - Serve uploaded files (handles /uploads/subfolder/filename)
+    'GET /uploads/{subfolder}/{filename}' => 'uploads.php',
 ];
 
 // Simple router

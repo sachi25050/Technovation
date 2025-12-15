@@ -525,6 +525,14 @@ class ApiService {
   async deleteAward(awardId) {
     return this.delete(`/admin/awards/${awardId}`);
   }
+
+  /**
+   * Get admin dashboard data with statistics and institution performance
+   * @returns {Promise} - API response with stats, activities, and institution performance
+   */
+  async getDashboard() {
+    return this.get('/admin/dashboard');
+  }
 }
 
 export default new ApiService();

@@ -3,9 +3,23 @@
 // Template's basic typography configurations.
 // 
 
+html {
+    width: 100%;
+    overflow-x: hidden;
+}
+
 body {
     font-family: $f-family;
     letter-spacing: -.3px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+#app {
+    width: 100%;
+    min-height: 100vh;
 }
 
 $headers-font-sizes: ( "1": 48px, "2": 36px, "3": 30px, "4": 24px, "5": 20px, "6": 16px ) ;
