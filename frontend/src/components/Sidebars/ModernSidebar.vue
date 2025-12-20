@@ -168,12 +168,13 @@
             :alt="currentUser.name || 'Judge'"
             @error="handleImageError"
           />
-          <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg v-else width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
           </svg>
         </div>
         <div class="user-profile-info">
+          <span class="user-welcome-text">WELCOME!</span>
           <span class="user-profile-name">{{ currentUser.name }}</span>
           <span class="user-profile-role">Judge</span>
         </div>
@@ -549,30 +550,33 @@ export default {
 /* User Profile Section for Judger */
 .user-profile-section {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 12px;
-  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
-  border-radius: 8px;
+  padding: 24px 16px;
+  background: #ffffff;
+  border-radius: 12px;
   gap: 12px;
+  border: 1px solid #E5E7EB;
 }
 
 .user-profile-avatar {
-  width: 40px;
-  height: 40px;
-  background: rgba(255, 255, 255, 0.15);
+  width: 120px;
+  height: 120px;
+  background: #F3F4F6;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #6B7280;
   overflow: hidden;
   flex-shrink: 0;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 3px solid #3bb9df;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.2);
 }
 
 .user-profile-avatar.has-image {
   background: transparent;
-  border-color: #60a5fa;
+  border-color: #3bb9df;
 }
 
 .user-profile-avatar img {
@@ -584,56 +588,64 @@ export default {
 }
 
 .user-profile-avatar svg {
-  width: 20px;
-  height: 20px;
-  stroke: #fff;
+  width: 40px;
+  height: 40px;
+  stroke: #6B7280;
 }
 
 .user-profile-info {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  align-items: center;
+  text-align: center;
+}
+
+.user-welcome-text {
+  font-size: 10px;
+  font-weight: 500;
+  color: #6B7280;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
 }
 
 .user-profile-name {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
-  color: #fff;
+  color: #2D3748;
   line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .user-profile-role {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  color: #6B7280;
   line-height: 1.2;
+  margin-top: 2px;
 }
 
 .user-logout-btn {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 8px;
-  border-radius: 6px;
+  background: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  padding: 10px 20px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #fff;
+  color: #6B7280;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  margin-top: 8px;
 }
 
 .user-logout-btn:hover {
-  background: rgba(220, 38, 38, 0.9);
+  background: #dc2626;
   border-color: #dc2626;
+  color: #fff;
   transform: scale(1.05);
 }
 
 .user-logout-btn:focus {
-  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline: 2px solid #007BFF;
   outline-offset: 2px;
 }
 
@@ -643,8 +655,7 @@ export default {
 
 /* Collapsed state for user profile */
 .modern-sidebar.collapsed .user-profile-section {
-  flex-direction: column;
-  padding: 12px 8px;
+  padding: 16px 8px;
   gap: 8px;
 }
 
@@ -653,12 +664,12 @@ export default {
 }
 
 .modern-sidebar.collapsed .user-profile-avatar {
-  width: 32px;
-  height: 32px;
+  width: 56px;
+  height: 56px;
 }
 
 .modern-sidebar.collapsed .user-logout-btn {
-  padding: 6px;
+  padding: 8px;
 }
 
 /* Responsive Design */

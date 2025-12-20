@@ -36,7 +36,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 						<div class="form-row">
 							<div class="form-field judge-field">
 								<label>Name of the Judge</label>
-								<a-input v-model="judgeName"  :placeholder="currentUser.name"  readonly />
+								<a-input :value="judgeName" :placeholder="currentUser.name" disabled />
 								
 							</div>
 							<div class="form-field institute-field">
@@ -132,13 +132,15 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 											</span>
 									</td>
 									<td class="achieved-marks">
-										<a-input-number
+										<a-input
 											v-if="selectedInstitute && selectedAward"
-											v-model="criterion.marks"
-											:min="0"
-											@change="(value) => handleMarksChange(criterion, value)"
+											:value="criterion.marks"
+											@input="(e) => handleMarksInput(criterion, e.target.value)"
+											@blur="(e) => validateMarksOnBlur(criterion, e.target.value)"
 											class="modern-marks-input"
 											placeholder="0"
+											type="text"
+											maxlength="2"
 										/>
 										<span v-else class="placeholder-dash">-</span>
 									</td>
@@ -745,20 +747,60 @@ import apiService from '@/services/api'
 				// This method is called automatically when marks change
 				// The total is computed reactively
 			},
-			handleMarksChange(criterion, value) {
-				// Validate that achieved marks don't exceed allocated marks
-				if (value !== null && value > criterion.allocated) {
+		handleMarksChange(criterion, value) {
+			// Validate that achieved marks don't exceed allocated marks
+			if (value !== null && value > criterion.allocated) {
+				this.$message.destroy();
+				this.$message.warning({
+					content: `Marks cannot exceed ${criterion.allocated}. Resetting to 0.`,
+					duration: 2
+				});
+				// Reset to zero when exceeded
+				this.$nextTick(() => {
+					criterion.marks = 0;
+				});
+			}
+			this.updateTotal();
+		},
+		handleMarksInput(criterion, value) {
+			// Allow only numbers and limit to 2 digits
+			let numericValue = value.replace(/[^0-9]/g, '').slice(0, 2);
+			let parsedValue = numericValue === '' ? null : parseInt(numericValue, 10);
+			
+			// Validate against allocated marks
+			if (parsedValue !== null && parsedValue > criterion.allocated) {
+				parsedValue = 0;
+				// Destroy existing messages and show only one
+				this.$message.destroy();
+				this.$message.warning({
+					content: `Marks cannot exceed the allocated value of ${criterion.allocated}. Resetting to 0.`,
+					duration: 2
+				});
+			}
+			
+			criterion.marks = parsedValue;
+			this.updateTotal();
+		},
+		validateMarksOnBlur(criterion, value) {
+			const numericValue = value.replace(/[^0-9]/g, '');
+			let parsedValue = numericValue === '' ? null : parseInt(numericValue, 10);
+			
+			// Ensure value doesn't exceed 100 or allocated marks - reset to 0 if exceeded
+			if (parsedValue !== null) {
+				const maxAllowed = Math.min(100, criterion.allocated);
+				if (parsedValue > maxAllowed) {
+					parsedValue = 0;
+					this.$message.destroy();
 					this.$message.warning({
-						content: `Achieved marks cannot exceed the allocated value of ${criterion.allocated} for "${criterion.name}". Value has been adjusted to the maximum.`,
-						duration: 4
-					});
-					// Reset to the maximum allocated value
-					this.$nextTick(() => {
-						criterion.marks = criterion.allocated;
+						content: `Marks cannot exceed the allocated value of ${criterion.allocated}. Resetting to 0.`,
+						duration: 2
 					});
 				}
-				this.updateTotal();
-			},
+			}
+			
+			criterion.marks = parsedValue;
+			this.updateTotal();
+		},
 			async checkForDuplicate() {
 				if (!this.selectedInstitute || !this.selectedAward) {
 					return;
@@ -1608,6 +1650,12 @@ import apiService from '@/services/api'
 // Specific field widths - fully increased widths
 .judge-field {
 	flex: 1;
+	
+	:deep(.ant-input[disabled]) {
+		color: #000000 !important;
+		-webkit-text-fill-color: #000000 !important;
+		cursor: default !important;
+	}
 }
 
 .institute-field {
@@ -1846,8 +1894,8 @@ import apiService from '@/services/api'
 	padding-left: 4px;
 	
 	.award-text {
-		font-weight: 500;
-		font-size: 9px;
+		font-weight: 700;
+		font-size: 12px;
 		color: #475569;
 		white-space: nowrap;
 		overflow: hidden;
@@ -2590,9 +2638,9 @@ import apiService from '@/services/api'
 	.criteria-text {
 		font-weight: 600;
 		color: #1E293B;
-		line-height: 1.4;
+		line-height: 1.0;
 		display: block;
-		font-size: 13px;
+		font-size: 10px;
 		
 		.weightage-label {
 			color: #dc2626;
@@ -3394,7 +3442,7 @@ import apiService from '@/services/api'
 
 // Table Cells - Readable Styling
 .modern-marks-table td {
-	padding: 10px 8px;
+	padding: 8px 8px;
 	border: none;
 	vertical-align: middle;
 	transition: all 0.2s ease;
@@ -3804,7 +3852,7 @@ import apiService from '@/services/api'
 .filter-row label {
 	font-weight: 500;
 	color: #2C3E50;
-	font-size: 10px;
+	font-size: 12px;
 	min-width: auto;
 }
 
@@ -5080,6 +5128,40 @@ import apiService from '@/services/api'
 .ant-modal-confirm-info {
 	.ant-modal-confirm-body > .anticon {
 		color: #3b82f6 !important;
+	}
+}
+
+// Bigger validation message styling
+.ant-message {
+	top: 100px !important;
+	
+	.ant-message-notice {
+		.ant-message-notice-content {
+			padding: 20px 32px !important;
+			font-size: 18px !important;
+			font-weight: 700 !important;
+			border-radius: 12px !important;
+			box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25) !important;
+			background: #fffbeb !important;
+			border: 2px solid #f59e0b !important;
+		}
+		
+		.ant-message-warning {
+			display: flex !important;
+			align-items: center !important;
+			
+			.anticon {
+				font-size: 28px !important;
+				margin-right: 16px !important;
+				color: #d97706 !important;
+			}
+			
+			span:last-child {
+				color: #92400e !important;
+				font-size: 18px !important;
+				font-weight: 700 !important;
+			}
+		}
 	}
 }
 </style>

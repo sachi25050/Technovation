@@ -173,12 +173,12 @@
 			<a-col :span="24" :lg="8">
 				<a-card title="Institution Statistics" class="mb-24">
 					<a-row :gutter="16">
-						<a-col :span="12">
+						<!-- <a-col :span="12">
 							<div class="stat-item">
 								<div class="stat-value">{{ institutionStats.total }}</div>
 								<div class="stat-label">Total</div>
 							</div>
-						</a-col>
+						</a-col> -->
 						<a-col :span="12">
 							<div class="stat-item">
 								<div class="stat-value">{{ institutionStats.institutes }}</div>
@@ -186,7 +186,7 @@
 							</div>
 						</a-col>
 					</a-row>
-					<a-row :gutter="16" style="margin-top: 16px;">
+					<!-- <a-row :gutter="16" style="margin-top: 16px;">
 						<a-col :span="12">
 							<div class="stat-item">
 								<div class="stat-value">{{ institutionStats.awards }}</div>
@@ -199,7 +199,7 @@
 								<div class="stat-label">N/A</div>
 							</div>
 						</a-col>
-					</a-row>
+					</a-row> -->
 				</a-card>
 			</a-col>
 		</a-row>

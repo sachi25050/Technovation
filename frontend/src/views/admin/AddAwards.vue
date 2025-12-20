@@ -104,12 +104,12 @@
 									/>
 								</a-col>
 								<a-col :span="6">
-									<a-input-number
-										v-model="criterion.marks"
+									<a-input
+										:value="criterion.marks"
+										@input="(e) => handleCriterionMarksInput(criterion, e.target.value)"
 										placeholder="Marks"
 										style="width: 100%"
-										:min="1"
-										:max="1000"
+										maxlength="2"
 									/>
 								</a-col>
 								<a-col :span="2">
@@ -227,7 +227,7 @@
 							</div>
 						</a-col>
 					</a-row>
-					<a-row :gutter="16" style="margin-top: 16px;">
+					<!-- <a-row :gutter="16" style="margin-top: 16px;">
 						<a-col :span="12">
 							<div class="stat-item">
 								<div class="stat-value">N/A</div>
@@ -240,7 +240,7 @@
 								<div class="stat-label">N/A</div>
 							</div>
 						</a-col>
-					</a-row>
+					</a-row> -->
 				</a-card>
 			</a-col>
 		</a-row>
@@ -505,6 +505,11 @@
 				if (this.criteria.length > 1) {
 					this.criteria.splice(index, 1);
 				}
+			},
+			handleCriterionMarksInput(criterion, value) {
+				// Only allow digits and limit to 2 characters
+				const cleanedValue = value.replace(/[^0-9]/g, '').slice(0, 2);
+				criterion.marks = cleanedValue ? parseInt(cleanedValue, 10) : null;
 			},
 			getCategoryColor(category) {
 				const colors = {
