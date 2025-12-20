@@ -1388,8 +1388,8 @@ import apiService from '@/services/api'
 
 // Main Content - Full Width Layout
 .main-content {
-	padding: 8px;
-	min-height: calc(100vh - 120px);
+	padding: 4px;
+	min-height: calc(100vh - 80px);
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
@@ -1403,29 +1403,37 @@ import apiService from '@/services/api'
 	margin: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 6px;
 	box-sizing: border-box;
 }
 
 // A. General Details Section - Full Width
 .general-details-section {
 	background: white;
-	border-radius: 8px;
-	padding: 12px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	border-radius: 6px;
+	padding: 10px 12px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 	border: 1px solid #e2e8f0;
 	width: 100%;
 	box-sizing: border-box;
+	position: relative;
 }
 
 // General Details Wrapper with Image
 .general-details-wrapper {
+	position: relative;
+	padding-right: 100px; // Make room for the institution image
+	
+	@media (max-width: 768px) {
+		padding-right: 95px;
+	}
+	
 	.section-header-with-image {
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-start;
-		gap: 16px;
-		margin-bottom: 16px;
+		gap: 12px;
+		margin-bottom: 4px;
 		
 		.section-header {
 			margin-bottom: 0;
@@ -1442,23 +1450,28 @@ import apiService from '@/services/api'
 // Institution Image Container - Right side of header
 .institution-image-container {
 	flex-shrink: 0;
-	width: 120px;
-	height: 85px;
+	width: 100px;
+	height: 70px;
+	position: absolute;
+	top: 8px;
+	right: 20px;
 	
 	@media (max-width: 768px) {
-		width: 100px;
-		height: 70px;
+		width: 80px;
+		height: 55px;
+		top: 6px;
+		right: 8px;
 	}
 }
 
 .institution-image-wrapper {
 	width: 100%;
 	height: 100%;
-	border-radius: 8px;
+	border-radius: 4px;
 	overflow: hidden;
-	border: 2px solid #e2e8f0;
+	border: 1px solid #e2e8f0;
 	background: #f8fafc;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 	
 	.institution-image {
 		width: 100%;
@@ -1471,60 +1484,62 @@ import apiService from '@/services/api'
 .institution-image-placeholder {
 	width: 100%;
 	height: 100%;
-	border-radius: 8px;
-	border: 2px dashed #cbd5e1;
+	border-radius: 4px;
+	border: 1px dashed #cbd5e1;
 	background: #f8fafc;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 4px;
+	gap: 2px;
 	
 	.placeholder-icon {
-		font-size: 24px;
+		font-size: 18px;
 		color: #94a3b8;
 	}
 	
 	.placeholder-text {
-		font-size: 10px;
+		font-size: 8px;
 		color: #94a3b8;
 		font-weight: 500;
 	}
 }
 
 .section-title {
-	font-size: 12px;
+	font-size: 11px;
 	font-weight: 600;
 	color: #1E293B;
-	margin: 0 0 8px 0;
+	margin: 0 0 4px 0;
 	letter-spacing: -0.025em;
 }
 
 .section-content {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 2px;
+	margin-top: 8px;
 	
 	@media (min-width: 768px) {
-		gap: 16px;
+		gap: 4px;
+		margin-top: 10px;
 	}
 }
 
 .form-row {
 	display: flex;
-	gap: 12px;
+	gap: 20px;
 	
 	@media (min-width: 768px) {
-		gap: 16px;
+		gap: 30px;
 	}
 	
 	@media (min-width: 1024px) {
-		gap: 20px;
+		gap: 40px;
 	}
 	
 	@media (max-width: 767px) {
 		flex-direction: column;
-		gap: 8px;
+		gap: 4px;
 	}
 }
 
@@ -1532,12 +1547,61 @@ import apiService from '@/services/api'
 	flex: 1;
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 0px;
 	
 	label {
 		font-weight: 500;
-		color: #2C3E50;
-		font-size: 10px;
+		color: #64748b;
+		font-size: 11px;
+		margin-bottom: 2px;
+	}
+	
+	// Underline style inputs like reference image
+	:deep(.ant-input),
+	:deep(.ant-input-number) {
+		height: 32px !important;
+		font-size: 14px !important;
+		padding: 4px 0 !important;
+		border-radius: 0 !important;
+		border: none !important;
+		border-bottom: 1px solid #e2e8f0 !important;
+		background: transparent !important;
+		box-shadow: none !important;
+		
+		&:focus, &:hover {
+			border-bottom-color: #3b82f6 !important;
+			box-shadow: none !important;
+		}
+	}
+	
+	:deep(.ant-select) {
+		font-size: 14px !important;
+	}
+	
+	:deep(.ant-select-selector) {
+		height: 32px !important;
+		font-size: 14px !important;
+		border-radius: 0 !important;
+		border: none !important;
+		border-bottom: 1px solid #e2e8f0 !important;
+		padding: 0 !important;
+		background: transparent !important;
+		box-shadow: none !important;
+	}
+	
+	:deep(.ant-select-focused .ant-select-selector) {
+		border-bottom-color: #3b82f6 !important;
+		box-shadow: none !important;
+	}
+	
+	:deep(.ant-select-selection-item) {
+		line-height: 30px !important;
+		font-size: 14px !important;
+	}
+	
+	:deep(.ant-select-selection-placeholder) {
+		line-height: 30px !important;
+		font-size: 14px !important;
 	}
 }
 
@@ -1555,29 +1619,27 @@ import apiService from '@/services/api'
 }
 
 .award-row {
-	margin-top: 8px;
+	margin-top: 2px;
 }
 
-// D. Summary Section (Marking Sheet) - Modern Design
+// D. Summary Section (Marking Sheet) - Compact Design
 .summary-section {
 	background: white;
-	border-radius: 16px;
-	padding: 20px;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	border-radius: 6px;
+	padding: 10px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 	border: 1px solid #e2e8f0;
 	width: 100%;
 	box-sizing: border-box;
 	
 	@media (min-width: 768px) {
-		padding: 24px;
-		border-radius: 20px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+		padding: 12px;
+		border-radius: 8px;
 	}
 	
 	@media (min-width: 1024px) {
-		padding: 28px;
-		border-radius: 24px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+		padding: 14px;
+		border-radius: 10px;
 	}
 }
 
@@ -1585,18 +1647,18 @@ import apiService from '@/services/api'
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 20px;
+	margin-bottom: 8px;
 	
 	@media (min-width: 768px) {
-		margin-bottom: 24px;
+		margin-bottom: 10px;
 	}
 	
 	@media (min-width: 1024px) {
-		margin-bottom: 28px;
+		margin-bottom: 12px;
 	}
 	
 	h3, h6 {
-		font-size: 18px;
+		font-size: 14px;
 		font-weight: 700;
 		color: #1E293B;
 		margin: 0;
@@ -1641,13 +1703,13 @@ import apiService from '@/services/api'
 .summary-delete-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
-	padding: 6px 12px;
+	gap: 3px;
+	padding: 4px 8px;
 	background: #fee2e2;
 	border: 1px solid #fecaca;
-	border-radius: 4px;
+	border-radius: 3px;
 	color: #991b1b;
-	font-size: 12px;
+	font-size: 10px;
 	font-weight: 500;
 	cursor: pointer;
 	transition: all 0.2s ease;
@@ -1670,13 +1732,13 @@ import apiService from '@/services/api'
 .summary-edit-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
-	padding: 6px 16px;
+	gap: 3px;
+	padding: 4px 10px;
 	background: #10b981;
 	border: 1px solid #059669;
-	border-radius: 4px;
+	border-radius: 3px;
 	color: white;
-	font-size: 12px;
+	font-size: 10px;
 	font-weight: 500;
 	cursor: pointer;
 	transition: all 0.2s ease;
@@ -1692,18 +1754,18 @@ import apiService from '@/services/api'
 	}
 }
 
-// Modern Evaluation Table - Fixed Layout
+// Modern Evaluation Table - Compact Fixed Layout
 .modern-evaluation-table {
 	width: 100%;
-	min-width: 1500px;
+	min-width: 1200px;
 	border-collapse: collapse;
 	background: white;
-	font-size: 12px;
+	font-size: 10px;
 	table-layout: fixed;
 }
 
 // Colgroup - Fixed column widths for alignment
-.col-checkbox { width: 35px; }
+.col-checkbox { width: 28px; }
 .col-institute { width: 130px; }
 .col-award { width: 150px; }
 .col-criteria { width: 50px; }
@@ -1713,14 +1775,14 @@ import apiService from '@/services/api'
 
 .table-header {
 	background: linear-gradient(135deg, #E8F1FD 0%, #F0F7FF 100%);
-	border-bottom: 2px solid #3b82f6;
+	border-bottom: 1px solid #3b82f6;
 	
 	tr {
-		height: 40px;
+		height: 28px;
 	}
 }
 
-// Header cells - consistent styling
+// Header cells - compact consistent styling
 .th-checkbox,
 .th-institute,
 .th-award,
@@ -1728,10 +1790,10 @@ import apiService from '@/services/api'
 .th-pres-score,
 .th-volume-score,
 .th-aggregate {
-	padding: 8px 4px;
+	padding: 4px 3px;
 	text-align: center;
-	font-weight: 700;
-	font-size: 11px;
+	font-weight: 600;
+	font-size: 9px;
 	color: #1E293B;
 	letter-spacing: 0.02em;
 	border: none;
@@ -1740,14 +1802,14 @@ import apiService from '@/services/api'
 }
 
 .th-checkbox { text-align: center; }
-.th-institute { text-align: left; padding-left: 8px; }
-.th-award { text-align: left; padding-left: 6px; }
-.th-criteria { text-align: center; font-size: 10px; }
-.th-pres-score { text-align: center; font-size: 10px; }
-.th-volume-score { text-align: center; font-size: 10px; }
-.th-aggregate { text-align: center; font-size: 10px; }
+.th-institute { text-align: left; padding-left: 6px; }
+.th-award { text-align: left; padding-left: 4px; }
+.th-criteria { text-align: center; font-size: 8px; }
+.th-pres-score { text-align: center; font-size: 8px; }
+.th-volume-score { text-align: center; font-size: 8px; }
+.th-aggregate { text-align: center; font-size: 8px; }
 
-// Data cells - consistent styling matching headers
+// Data cells - compact styling matching headers
 .td-checkbox,
 .td-institute,
 .td-award,
@@ -1755,10 +1817,10 @@ import apiService from '@/services/api'
 .td-pres-score,
 .td-volume-score,
 .td-aggregate {
-	padding: 6px 4px;
+	padding: 4px 3px;
 	border: none;
 	vertical-align: middle;
-	font-size: 12px;
+	font-size: 10px;
 }
 
 .td-checkbox {
@@ -1767,11 +1829,11 @@ import apiService from '@/services/api'
 
 .td-institute {
 	text-align: left;
-	padding-left: 8px;
+	padding-left: 6px;
 	
 	.institute-name {
 		font-weight: 600;
-		font-size: 12px;
+		font-size: 10px;
 		color: #1E293B;
 		white-space: nowrap;
 		overflow: hidden;
@@ -1781,11 +1843,11 @@ import apiService from '@/services/api'
 
 .td-award {
 	text-align: left;
-	padding-left: 6px;
+	padding-left: 4px;
 	
 	.award-text {
 		font-weight: 500;
-		font-size: 11px;
+		font-size: 9px;
 		color: #475569;
 		white-space: nowrap;
 		overflow: hidden;
@@ -1796,28 +1858,28 @@ import apiService from '@/services/api'
 .td-criteria {
 	text-align: center;
 	font-weight: 600;
-	font-size: 12px;
+	font-size: 10px;
 	color: #1E293B;
 }
 
 .td-pres-score {
 	text-align: center;
 	font-weight: 600;
-	font-size: 12px;
+	font-size: 10px;
 	color: #059669;
 }
 
 .td-volume-score {
 	text-align: center;
 	font-weight: 600;
-	font-size: 12px;
+	font-size: 10px;
 	color: #7c3aed;
 }
 
 .td-aggregate {
 	text-align: center;
 	font-weight: 700;
-	font-size: 12px;
+	font-size: 10px;
 	color: #2563EB;
 }
 
@@ -2351,32 +2413,30 @@ import apiService from '@/services/api'
 	}
 }
 
-// Dynamic Marking Criteria Section
+// Dynamic Marking Criteria Section - Compact
 .marking-criteria-section {
 	background: white;
-	border-radius: 16px;
-	padding: 20px;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	border-radius: 6px;
+	padding: 8px 10px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	border: 1px solid #e2e8f0;
 	width: 100%;
 	box-sizing: border-box;
 	
 	@media (min-width: 768px) {
-		padding: 24px;
-		border-radius: 20px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+		padding: 10px 12px;
+		border-radius: 8px;
 	}
 	
 	@media (min-width: 1024px) {
-		padding: 28px;
-		border-radius: 24px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+		padding: 10px 14px;
+		border-radius: 8px;
 	}
 }
 
 .criteria-content {
 	p {
-		margin: 0 0 8px 0;
+		margin: 0 0 6px 0;
 		color: #374151;
 		font-size: 14px;
 		line-height: 1.5;
@@ -2587,16 +2647,16 @@ import apiService from '@/services/api'
 	}
 }
 
-// Modern Input Styling - Enhanced with Bold Centered Text
+// Modern Input Styling - Readable with Bold Centered Text
 .modern-marks-input {
 	width: 70px !important;
 	text-align: center !important;
-	border: 2px solid #e2e8f0 !important;
-	border-radius: 8px !important;
+	border: 1px solid #e2e8f0 !important;
+	border-radius: 6px !important;
 	font-weight: 700 !important;
-	font-size: 13px !important;
-	height: 36px !important;
-	transition: all 0.3s ease !important;
+	font-size: 14px !important;
+	height: 32px !important;
+	transition: all 0.2s ease !important;
 	background: white !important;
 	line-height: 1.4 !important;
 	
@@ -2604,7 +2664,7 @@ import apiService from '@/services/api'
 	input {
 		text-align: center !important;
 		font-weight: 700 !important;
-		font-size: 13px !important;
+		font-size: 14px !important;
 	}
 	
 	&:hover {
@@ -2907,12 +2967,12 @@ import apiService from '@/services/api'
 }
 
 
-// C. Filter Section - Modern Card Design
+// C. Filter Section - Compact Card Design
 .filter-section {
 	background: white;
-	border-radius: 16px;
-	padding: 20px;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	border-radius: 6px;
+	padding: 8px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	border: 1px solid #e2e8f0;
 	width: 100%;
 	box-sizing: border-box;
@@ -2930,12 +2990,12 @@ import apiService from '@/services/api'
 	}
 }
 
-// Filter Header with Remove Filter Button
+// Filter Header with Remove Filter Button - Compact
 .filter-header {
 	display: flex;
 	justify-content: flex-end;
 	align-items: center;
-	margin-bottom: 12px;
+	margin-bottom: 6px;
 	
 	.filter-header-spacer {
 		flex: 1;
@@ -2945,13 +3005,13 @@ import apiService from '@/services/api'
 .filter-remove-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
-	padding: 8px 14px;
+	gap: 4px;
+	padding: 4px 10px;
 	background: #fca5a5;
 	border: 1px solid #f87171;
-	border-radius: 6px;
+	border-radius: 4px;
 	color: #991b1b;
-	font-size: 13px;
+	font-size: 11px;
 	font-weight: 500;
 	cursor: pointer;
 	transition: all 0.2s ease;
@@ -2973,23 +3033,23 @@ import apiService from '@/services/api'
 .filter-content {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: 6px;
 	width: 100%;
 	
 	@media (min-width: 768px) {
 		flex-direction: row;
-		gap: 20px;
+		gap: 10px;
 	}
 	
 	@media (min-width: 1024px) {
-		gap: 24px;
+		gap: 12px;
 	}
 }
 
 .filter-row {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 3px;
 	flex: 1;
 	width: 100%;
 	
@@ -3014,10 +3074,10 @@ import apiService from '@/services/api'
 	width: 100% !important;
 	
 	.ant-select-selector {
-		height: 40px !important;
-		border-radius: 8px !important;
+		height: 28px !important;
+		border-radius: 4px !important;
 		border: 1px solid #d1d5db !important;
-		font-size: 14px !important;
+		font-size: 12px !important;
 		transition: all 0.2s ease !important;
 		
 		&:hover {
@@ -3027,7 +3087,7 @@ import apiService from '@/services/api'
 		&:focus,
 		&.ant-select-focused .ant-select-selector {
 			border-color: #3b82f6 !important;
-			box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+			box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
 		}
 		
 		@media (min-width: 768px) {
@@ -3124,78 +3184,15 @@ import apiService from '@/services/api'
 	}
 }
 
-// B. Presentation Marks Section - Modern Design
+// B. Presentation Marks Section - Compact Design
 .presentation-marks-section {
 	background: white;
-	border-radius: 16px;
-	padding: 20px;
-	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+	border-radius: 6px;
+	padding: 10px;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 	border: 1px solid #e2e8f0;
 	position: relative;
 	overflow: hidden;
-	
-	&::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 4px;
-		background: linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%);
-	}
-	
-	@media (min-width: 768px) {
-		padding: 24px;
-		border-radius: 20px;
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-	}
-	
-	@media (min-width: 1024px) {
-		padding: 28px;
-		border-radius: 24px;
-	}
-}
-
-.section-header {
-	margin-bottom: 12px;
-	
-	@media (min-width: 768px) {
-		margin-bottom: 16px;
-	}
-	
-	@media (min-width: 1024px) {
-		margin-bottom: 20px;
-	}
-	
-	h2 {
-		font-size: 14px;
-		font-weight: 700;
-		color: #2C3E50;
-		margin: 0;
-		border-bottom: 3px solid #B03A2E;
-		padding-bottom: 4px;
-		display: inline-block;
-		
-		@media (min-width: 768px) {
-			font-size: 16px;
-			padding-bottom: 6px;
-		}
-	}
-}
-
-// Modern Marks Container
-.modern-marks-container {
-	margin-bottom: 20px;
-	overflow: hidden;
-}
-
-.modern-table-wrapper {
-	background: white;
-	border-radius: 16px;
-	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-	overflow: hidden;
-	border: 1px solid #e2e8f0;
-	position: relative;
 	
 	&::before {
 		content: '';
@@ -3204,12 +3201,73 @@ import apiService from '@/services/api'
 		left: 0;
 		right: 0;
 		height: 3px;
+		background: linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%);
+	}
+	
+	@media (min-width: 768px) {
+		padding: 12px;
+		border-radius: 8px;
+	}
+	
+	@media (min-width: 1024px) {
+		padding: 14px;
+		border-radius: 10px;
+	}
+}
+
+.section-header {
+	margin-bottom: 6px;
+	
+	@media (min-width: 768px) {
+		margin-bottom: 8px;
+	}
+	
+	@media (min-width: 1024px) {
+		margin-bottom: 10px;
+	}
+	
+	h2 {
+		font-size: 14px;
+		font-weight: 700;
+		color: #2C3E50;
+		margin: 0;
+		border-bottom: 2px solid #B03A2E;
+		padding-bottom: 3px;
+		display: inline-block;
+		
+		@media (min-width: 768px) {
+			font-size: 15px;
+			padding-bottom: 4px;
+		}
+	}
+}
+
+// Modern Marks Container
+.modern-marks-container {
+	margin-bottom: 10px;
+	overflow: hidden;
+}
+
+.modern-table-wrapper {
+	background: white;
+	border-radius: 6px;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+	overflow: hidden;
+	border: 1px solid #e2e8f0;
+	position: relative;
+	
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
 		background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%);
 	}
 	
 	@media (min-width: 768px) {
-		border-radius: 20px;
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+		border-radius: 8px;
 	}
 }
 
@@ -3240,10 +3298,10 @@ import apiService from '@/services/api'
 }
 
 .modern-marks-table th {
-	padding: 16px 12px;
+	padding: 10px 8px;
 	text-align: center;
 	font-weight: 700;
-	font-size: 14px;
+	font-size: 13px;
 	color: #1E293B;
 	letter-spacing: 0.025em;
 	position: relative;
@@ -3260,24 +3318,24 @@ import apiService from '@/services/api'
 	}
 	
 	@media (min-width: 768px) {
-		padding: 18px 16px;
-		font-size: 15px;
+		padding: 12px 10px;
+		font-size: 14px;
 	}
 	
 	@media (min-width: 1024px) {
-		padding: 20px 18px;
-		font-size: 16px;
+		padding: 12px 10px;
+		font-size: 14px;
 	}
 }
 
-// Table Body - Modern Rows
+// Table Body - Compact Rows
 .modern-marks-table tbody tr {
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	transition: all 0.2s ease;
 	border-bottom: 1px solid #f1f5f9;
 	position: relative;
 	
 	&:nth-child(even) {
-		background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+		background: #f8fafc;
 	}
 	
 	&:nth-child(odd) {
@@ -3285,15 +3343,13 @@ import apiService from '@/services/api'
 	}
 	
 	&:hover {
-		background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%) !important;
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
-		border-left: 4px solid #3b82f6;
+		background: #e0f2fe !important;
+		border-left: 3px solid #3b82f6;
 	}
 	
 	&.error-row {
-		background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%) !important;
-		border-left: 4px solid #ef4444;
+		background: #fef2f2 !important;
+		border-left: 3px solid #ef4444;
 		
 		.criteria-text {
 			color: #dc2626;
@@ -3336,22 +3392,22 @@ import apiService from '@/services/api'
 	}
 }
 
-// Table Cells - Modern Styling
+// Table Cells - Readable Styling
 .modern-marks-table td {
-	padding: 14px 12px;
+	padding: 10px 8px;
 	border: none;
 	vertical-align: middle;
 	transition: all 0.2s ease;
-	font-size: 14px;
+	font-size: 13px;
 	
 	@media (min-width: 768px) {
-		padding: 16px 14px;
-		font-size: 15px;
+		padding: 12px 10px;
+		font-size: 14px;
 	}
 	
 	@media (min-width: 1024px) {
-		padding: 18px 16px;
-		font-size: 16px;
+		padding: 12px 10px;
+		font-size: 14px;
 	}
 }
 
@@ -3370,6 +3426,10 @@ import apiService from '@/services/api'
 			color: #dc2626;
 			font-weight: 700;
 		}
+		
+		@media (min-width: 768px) {
+			font-size: 14px;
+		}
 	}
 }
 
@@ -3382,11 +3442,15 @@ import apiService from '@/services/api'
 		color: #2563EB;
 		font-size: 13px;
 		display: inline-block;
-		padding: 4px 8px;
+		padding: 4px 10px;
 		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
 		border-radius: 6px;
 		min-width: 35px;
-		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+		box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
+		
+		@media (min-width: 768px) {
+			font-size: 14px;
+		}
 	}
 }
 
@@ -3399,11 +3463,15 @@ import apiService from '@/services/api'
 		color: #1E293B;
 		font-size: 13px;
 		display: inline-block;
-		padding: 4px 8px;
+		padding: 4px 10px;
 		background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
 		border-radius: 6px;
 		min-width: 50px;
 		box-shadow: 0 1px 3px rgba(245, 158, 11, 0.2);
+		
+		@media (min-width: 768px) {
+			font-size: 14px;
+		}
 	}
 	
 	.aggregate-value {
@@ -3411,7 +3479,7 @@ import apiService from '@/services/api'
 		color: #1E293B;
 		font-size: 14px;
 		display: inline-block;
-		padding: 4px 8px;
+		padding: 4px 10px;
 		background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
 		border-radius: 6px;
 		min-width: 50px;
@@ -3419,17 +3487,19 @@ import apiService from '@/services/api'
 	}
 }
 
-// Modern Input Styling
+// Modern Input Styling - Readable
 .modern-marks-input {
-	width: 80px !important;
+	width: 70px !important;
 	text-align: center;
-	border-radius: 8px !important;
-	border: 2px solid #e2e8f0 !important;
+	border-radius: 6px !important;
+	border: 1px solid #e2e8f0 !important;
 	transition: all 0.2s ease !important;
+	height: 32px !important;
+	font-size: 14px !important;
 	
 	&:focus {
 		border-color: #3b82f6 !important;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
 	}
 	
 	&:hover {
@@ -3439,7 +3509,7 @@ import apiService from '@/services/api'
 
 .placeholder-dash {
 	color: #94a3b8;
-	font-size: 14px;
+	font-size: 13px;
 	font-weight: 500;
 }
 
@@ -3732,10 +3802,10 @@ import apiService from '@/services/api'
 }
 
 .filter-row label {
-	font-weight: 600;
+	font-weight: 500;
 	color: #2C3E50;
-	font-size: 12px;
-	min-width: 920px;
+	font-size: 10px;
+	min-width: auto;
 }
 
 .filter-select {

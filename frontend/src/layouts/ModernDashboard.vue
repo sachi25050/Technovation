@@ -7,9 +7,9 @@
     />
 
     <!-- Main Content Area -->
-    <div class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-      <!-- Header -->
-      <header class="dashboard-header">
+    <div class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'no-header': isJudgerRoute }">
+      <!-- Header (hidden for judger routes) -->
+      <header v-if="!isJudgerRoute" class="dashboard-header">
         <div class="header-left">
           <button class="sidebar-toggle" @click="toggleSidebar" :title="`${sidebarCollapsed ? 'Expand' : 'Collapse'} Sidebar (Ctrl+B)`">
             <svg v-if="!sidebarCollapsed" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -76,7 +76,7 @@
       </header>
 
       <!-- Page Content -->
-      <main class="page-content">
+      <main class="page-content" :class="{ 'full-height': isJudgerRoute }">
         <router-view />
       </main>
 
@@ -142,6 +142,9 @@ export default {
         .split('-')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ')
+    },
+    isJudgerRoute() {
+      return this.$route.path.startsWith('/judger')
     }
   },
   methods: {
@@ -499,6 +502,15 @@ export default {
   margin: 0;
   font-size: 12px;
   color: #6B7280;
+}
+
+/* No header layout adjustments */
+.main-content.no-header .page-content {
+  min-height: calc(100vh - 80px);
+}
+
+.page-content.full-height {
+  padding-top: 16px;
 }
 
 /* Mobile Overlay */

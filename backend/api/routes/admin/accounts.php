@@ -17,12 +17,81 @@ if ($user['role'] !== 'admin') {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
-// Handle both JSON and FormData requests
+
+// Read raw input once and store it (php://input can only be read once)
 $rawInput = file_get_contents('php://input');
+
+// Handle both JSON and FormData requests
 $input = json_decode($rawInput, true);
+
 // If JSON decode failed or input is empty, try reading from $_POST (FormData)
 if (json_last_error() !== JSON_ERROR_NONE || empty($input)) {
     $input = $_POST;
+}
+
+// For PUT/PATCH requests with multipart/form-data, PHP doesn't populate $_POST
+// We need to manually parse it
+if (($method === 'PUT' || $method === 'PATCH') && empty($input)) {
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    if (strpos($contentType, 'multipart/form-data') !== false) {
+        // Parse multipart form data for PUT requests
+        $putData = [];
+        $putFiles = [];
+        
+        // Get boundary from content type
+        preg_match('/boundary=(.*)$/', $contentType, $matches);
+        if (isset($matches[1])) {
+            $boundary = $matches[1];
+            
+            // Use the already-read raw input (don't read php://input again)
+            $rawData = $rawInput;
+            
+            // Split by boundary
+            $parts = preg_split('/-+' . preg_quote($boundary) . '/', $rawData);
+            
+            foreach ($parts as $part) {
+                if (empty(trim($part)) || $part === '--') continue;
+                
+                // Separate headers from body
+                $segments = preg_split('/\r\n\r\n/', $part, 2);
+                if (count($segments) < 2) continue;
+                
+                $headers = $segments[0];
+                $body = rtrim($segments[1], "\r\n");
+                
+                // Parse Content-Disposition header
+                if (preg_match('/Content-Disposition:.*name="([^"]+)"(?:;\s*filename="([^"]+)")?/i', $headers, $matches)) {
+                    $fieldName = $matches[1];
+                    $filename = $matches[2] ?? null;
+                    
+                    if ($filename) {
+                        // This is a file upload
+                        $tmpName = tempnam(sys_get_temp_dir(), 'put_');
+                        file_put_contents($tmpName, $body);
+                        
+                        // Get content type
+                        $fileContentType = 'application/octet-stream';
+                        if (preg_match('/Content-Type:\s*([^\r\n]+)/i', $headers, $ctMatches)) {
+                            $fileContentType = trim($ctMatches[1]);
+                        }
+                        
+                        $_FILES[$fieldName] = [
+                            'name' => $filename,
+                            'type' => $fileContentType,
+                            'tmp_name' => $tmpName,
+                            'error' => UPLOAD_ERR_OK,
+                            'size' => strlen($body)
+                        ];
+                    } else {
+                        // Regular field
+                        $putData[$fieldName] = $body;
+                    }
+                }
+            }
+        }
+        
+        $input = $putData;
+    }
 }
 
 // Get ID from URI if present

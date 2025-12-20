@@ -44,6 +44,7 @@ $routes = [
     
     // Admin - Accounts
     'GET /admin/accounts' => 'admin/accounts.php',
+    'GET /admin/accounts/{id}' => 'admin/accounts.php',
     'POST /admin/accounts' => 'admin/accounts.php',
     'PUT /admin/accounts/{id}' => 'admin/accounts.php',
     'DELETE /admin/accounts/{id}' => 'admin/accounts.php',

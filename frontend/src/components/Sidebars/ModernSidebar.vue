@@ -159,7 +159,35 @@
 
     <!-- Sidebar Footer -->
     <div class="sidebar-footer">
-      <div class="help-section">
+      <!-- User Profile Section for Judger -->
+      <div v-if="isJudger" class="user-profile-section">
+        <div class="user-profile-avatar" :class="{ 'has-image': currentUser.profile_image }">
+          <img 
+            v-if="currentUser.profile_image" 
+            :src="getProfileImageUrl(currentUser.profile_image)" 
+            :alt="currentUser.name || 'Judge'"
+            @error="handleImageError"
+          />
+          <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="user-profile-info">
+          <span class="user-profile-name">{{ currentUser.name }}</span>
+          <span class="user-profile-role">Judge</span>
+        </div>
+        <button class="user-logout-btn" @click="handleLogout" title="Logout">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 3H4C3.44772 3 3 3.44772 3 4V16C3 16.5523 3.44772 17 4 17H7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M13 7L17 11L13 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M17 11H7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Help Section for Non-Judger -->
+      <div v-else class="help-section">
         <div class="help-icon">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18Z" stroke="currentColor" stroke-width="2"/>
@@ -189,6 +217,7 @@
 
 <script>
 import userRoleStore from '@/store/userRole'
+import apiService from '@/services/api'
 
 export default {
   name: 'ModernSidebar',
@@ -196,6 +225,15 @@ export default {
     collapsed: {
       type: Boolean,
       default: false
+    }
+  },
+  data() {
+    return {
+      currentUser: {
+        name: 'Judge',
+        email: '',
+        profile_image: null
+      }
     }
   },
   computed: {
@@ -212,7 +250,65 @@ export default {
   methods: {
     toggleCollapse() {
       this.$emit('toggle-collapse')
+    },
+    getProfileImageUrl(imageUrl) {
+      if (!imageUrl) return null;
+      
+      if (imageUrl.includes('/backend/uploads/')) {
+        const pathMatch = imageUrl.match(/\/backend\/uploads\/(.+)$/);
+        if (pathMatch && pathMatch[1]) {
+          const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+          return `${apiBaseUrl}/uploads?path=${encodeURIComponent(pathMatch[1])}`;
+        }
+      }
+      
+      if (imageUrl.includes('localhost/') && !imageUrl.includes('localhost:')) {
+        imageUrl = imageUrl.replace('http://localhost/', 'http://localhost:8000/');
+        imageUrl = imageUrl.replace('https://localhost/', 'https://localhost:8000/');
+      }
+      
+      if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('blob:')) {
+        if (imageUrl.startsWith('//')) {
+          imageUrl = window.location.protocol + imageUrl;
+        } else if (imageUrl.startsWith('/')) {
+          imageUrl = 'http://localhost:8000' + imageUrl;
+        } else {
+          imageUrl = 'http://localhost:8000/' + imageUrl;
+        }
+      }
+      
+      return imageUrl;
+    },
+    handleImageError(event) {
+      event.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e5e7eb' width='100' height='100'/%3E%3Ccircle cx='50' cy='35' r='20' fill='%239ca3af'/%3E%3Cpath d='M20 85c0-22 13-30 30-30s30 8 30 30' fill='%239ca3af'/%3E%3C/svg%3E";
+      event.target.onerror = null;
+    },
+    async handleLogout() {
+      try {
+        await apiService.logout();
+        userRoleStore.setRole('admin');
+        this.$router.push('/sign-in');
+      } catch (error) {
+        console.error('Logout failed:', error);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        userRoleStore.setRole('admin');
+        this.$router.push('/sign-in');
+      }
+    },
+    loadUserData() {
+      const user = apiService.getCurrentUser();
+      if (user) {
+        this.currentUser = {
+          name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Judge',
+          email: user.email || '',
+          profile_image: user.profile_image || null
+        };
+      }
     }
+  },
+  mounted() {
+    this.loadUserData();
   }
 }
 </script>
@@ -448,6 +544,121 @@ export default {
   font-size: 12px;
   color: #6B7280;
   margin: 0;
+}
+
+/* User Profile Section for Judger */
+.user-profile-section {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.user-profile-avatar {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.user-profile-avatar.has-image {
+  background: transparent;
+  border-color: #60a5fa;
+}
+
+.user-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+.user-profile-avatar svg {
+  width: 20px;
+  height: 20px;
+  stroke: #fff;
+}
+
+.user-profile-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-profile-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-profile-role {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.2;
+}
+
+.user-logout-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-logout-btn:hover {
+  background: rgba(220, 38, 38, 0.9);
+  border-color: #dc2626;
+  transform: scale(1.05);
+}
+
+.user-logout-btn:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.user-logout-btn svg {
+  stroke: currentColor;
+}
+
+/* Collapsed state for user profile */
+.modern-sidebar.collapsed .user-profile-section {
+  flex-direction: column;
+  padding: 12px 8px;
+  gap: 8px;
+}
+
+.modern-sidebar.collapsed .user-profile-info {
+  display: none;
+}
+
+.modern-sidebar.collapsed .user-profile-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.modern-sidebar.collapsed .user-logout-btn {
+  padding: 6px;
 }
 
 /* Responsive Design */
