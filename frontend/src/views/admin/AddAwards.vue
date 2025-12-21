@@ -266,7 +266,7 @@
 						>
 							<span class="criterion-name">{{ criterion.name }}</span>
 							<a-tag color="blue" class="criterion-marks">
-								{{ criterion.allocated_marks || criterion.marks || 0 }} marks
+								{{ formatMarks(criterion.allocated_marks || criterion.marks) }} marks
 							</a-tag>
 						</div>
 					</div>
@@ -510,6 +510,16 @@
 				// Only allow digits and limit to 2 characters
 				const cleanedValue = value.replace(/[^0-9]/g, '').slice(0, 2);
 				criterion.marks = cleanedValue ? parseInt(cleanedValue, 10) : null;
+			},
+			/**
+			 * Format marks to remove unnecessary trailing zeros
+			 * 63.80 -> 63.8, 64.00 -> 64, 63.85 -> 63.85
+			 */
+			formatMarks(marks) {
+				if (marks === null || marks === undefined) return 0;
+				const num = parseFloat(marks);
+				if (isNaN(num)) return 0;
+				return parseFloat(num.toFixed(2));
 			},
 			getCategoryColor(category) {
 				const colors = {

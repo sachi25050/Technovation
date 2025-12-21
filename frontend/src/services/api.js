@@ -533,6 +533,68 @@ class ApiService {
   async getDashboard() {
     return this.get('/admin/dashboard');
   }
+
+  // ============================================
+  // Reporter API Methods
+  // ============================================
+
+  /**
+   * Generate a report
+   * @param {Object} reportData - Report configuration (reportType, reportFormat, title, filters)
+   * @returns {Promise} - API response with generated report info
+   */
+  async generateReport(reportData) {
+    return this.post('/reporter/reports', reportData);
+  }
+
+  /**
+   * Get all reports for the current reporter
+   * @param {Object} params - Query parameters (page, limit)
+   * @returns {Promise} - API response with reports list
+   */
+  async getReports(params = {}) {
+    return this.get('/reporter/reports', params);
+  }
+
+  /**
+   * Get a single report
+   * @param {number} reportId - Report ID
+   * @returns {Promise} - API response with report details
+   */
+  async getReport(reportId) {
+    return this.get(`/reporter/reports/${reportId}`);
+  }
+
+  /**
+   * Download a report file
+   * @param {number} reportId - Report ID
+   * @returns {Promise<Blob>} - File blob for download
+   */
+  async downloadReport(reportId) {
+    const url = `${API_BASE_URL}/reporter/reports/${reportId}/download`;
+    const token = localStorage.getItem('auth_token');
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to download report');
+    }
+    
+    return response.blob();
+  }
+
+  /**
+   * Get reporter dashboard data
+   * @returns {Promise} - API response with reporter statistics
+   */
+  async getReporterData() {
+    return this.get('/reporter/data');
+  }
 }
 
 export default new ApiService();

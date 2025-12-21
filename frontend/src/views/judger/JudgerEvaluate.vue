@@ -11,33 +11,14 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 				<!-- A. General Details Section -->
 				
 					<div class="filter-section general-details-wrapper">
-					<div class="section-header-with-image">
-						<div class="section-header">
-							<h2>General Details</h2>
-						</div>
-						<!-- Institution Image -->
-						<div class="institution-image-container">
-							<div class="institution-image-wrapper" v-if="selectedInstitutionImage">
-								<img 
-									:key="selectedInstitute + '-' + selectedInstitutionImage"
-									:src="selectedInstitutionImage" 
-									:alt="getInstituteName(selectedInstitute)"
-									class="institution-image"
-									@error="handleInstitutionImageError"
-								/>
-							</div>
-							<div class="institution-image-placeholder" v-else>
-								<a-icon type="bank" class="placeholder-icon" />
-								<span class="placeholder-text">No Image</span>
-							</div>
-						</div>
+					<div class="section-header">
+						<h2>General Details</h2>
 					</div>
 					<div class="section-content">
-						<div class="form-row">
+						<div class="form-row form-row-with-image">
 							<div class="form-field judge-field">
 								<label>Name of the Judge</label>
 								<a-input :value="judgeName" :placeholder="currentUser.name" disabled />
-								
 							</div>
 							<div class="form-field institute-field">
 								<label>Institute Name</label>
@@ -56,6 +37,21 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 										{{ institution.name }}
 									</a-select-option>
 								</a-select>
+							</div>
+							<!-- Institution Image - Same line as dropdowns -->
+							<div class="institution-image-inline">
+								<div class="institution-image-wrapper" v-if="selectedInstitutionImage">
+									<img 
+										:key="selectedInstitute + '-' + selectedInstitutionImage"
+										:src="selectedInstitutionImage" 
+										:alt="getInstituteName(selectedInstitute)"
+										class="institution-image"
+										@error="handleInstitutionImageError"
+									/>
+								</div>
+								<div class="institution-image-placeholder" v-else>
+									<a-icon type="bank" class="placeholder-icon" />
+								</div>
 							</div>
 						</div>
 						<div class="form-row award-row">
@@ -95,7 +91,10 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 
 					<div class="criteria-content">
 						<p><strong>Award Category:</strong> {{ getAwardName(selectedAward) }}</p>
-						<p><strong>Description:</strong> {{ getAwardDescription(selectedAward) }}</p>
+						<div class="description-block">
+							<strong>Description:</strong>
+							<pre class="description-text">{{ getAwardDescription(selectedAward) }}</pre>
+						</div>
 					</div>
 				</div>
 
@@ -1461,48 +1460,53 @@ import apiService from '@/services/api'
 	position: relative;
 }
 
-// General Details Wrapper with Image
+// General Details Wrapper
 .general-details-wrapper {
 	position: relative;
-	padding-right: 100px; // Make room for the institution image
 	
-	@media (max-width: 768px) {
-		padding-right: 95px;
-	}
-	
-	.section-header-with-image {
+	.form-row-with-image {
 		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: 12px;
-		margin-bottom: 4px;
+		align-items: flex-end;
+		gap: 16px;
 		
-		.section-header {
-			margin-bottom: 0;
+		.judge-field {
 			flex: 1;
+			min-width: 200px;
+		}
+		
+		.institute-field {
+			flex: 1.5;
+			min-width: 250px;
 		}
 		
 		@media (max-width: 768px) {
-			flex-direction: row;
-			align-items: flex-start;
+			flex-wrap: wrap;
+			
+			.judge-field,
+			.institute-field {
+				flex: 1 1 45%;
+				min-width: auto;
+			}
+		}
+		
+		@media (max-width: 480px) {
+			.judge-field,
+			.institute-field {
+				flex: 1 1 100%;
+			}
 		}
 	}
 }
 
-// Institution Image Container - Right side of header
-.institution-image-container {
+// Institution Image Inline - Same row as dropdowns
+.institution-image-inline {
 	flex-shrink: 0;
 	width: 100px;
-	height: 70px;
-	position: absolute;
-	top: 8px;
-	right: 20px;
+	height: 65px;
 	
 	@media (max-width: 768px) {
-		width: 80px;
-		height: 55px;
-		top: 6px;
-		right: 8px;
+		width: 70px;
+		height: 50px;
 	}
 }
 
@@ -1653,7 +1657,7 @@ import apiService from '@/services/api'
 	
 	:deep(.ant-input[disabled]) {
 		color: #000000 !important;
-		-webkit-text-fill-color: #000000 !important;
+			-webkit-text-fill-color: #000000 !important;
 		cursor: default !important;
 	}
 }
@@ -2504,6 +2508,36 @@ import apiService from '@/services/api'
 	
 	@media (min-width: 1024px) {
 			font-size: 16px;
+		}
+	}
+	
+	.description-block {
+		margin-top: 8px;
+		
+		strong {
+			color: #1f2937;
+			font-weight: 600;
+			display: block;
+			margin-bottom: 8px;
+		}
+		
+		.description-text {
+			margin: 0;
+			padding: 12px 16px;
+			background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+			border-left: 4px solid #10b981;
+			border-radius: 0 8px 8px 0;
+			font-family: inherit;
+			font-size: 14px;
+			line-height: 1.6;
+			color: #374151;
+			white-space: pre-wrap;
+			word-wrap: break-word;
+			overflow-wrap: break-word;
+			
+			@media (min-width: 768px) {
+				font-size: 15px;
+			}
 		}
 	}
 }

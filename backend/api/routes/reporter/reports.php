@@ -1,6 +1,7 @@
 <?php
 /**
  * Reporter - Reports Management
+ * Generates Award-wise and Bank-wise Excel reports matching the specification format
  */
 
 $db = Database::getInstance()->getConnection();
@@ -10,12 +11,15 @@ if (!$user || $user['role'] !== 'reporter') {
     Response::forbidden('Reporter access required');
 }
 
+// Include the Excel Report Generator
+require_once __DIR__ . '/../../../core/ExcelReportGenerator.php';
+
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 $id = isset($_GET['_params'][0]) ? (int)$_GET['_params'][0] : (isset($_GET['params'][0]) ? (int)$_GET['params'][0] : null);
 $action = isset($_GET['_params'][1]) ? $_GET['_params'][1] : (isset($_GET['params'][1]) ? $_GET['params'][1] : null);
 
-// Handle download
+// Handle download action
 if ($action === 'download' && $method === 'GET') {
     if (!$id) {
         Response::error('Report ID is required');
@@ -33,10 +37,22 @@ if ($action === 'download' && $method === 'GET') {
         Response::error('Report file not available', null, 404);
     }
     
+    // Determine content type based on format
+    $contentType = 'application/octet-stream';
+    if ($report['report_format'] === 'excel') {
+        $contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    } elseif ($report['report_format'] === 'pdf') {
+        $contentType = 'application/pdf';
+    } elseif ($report['report_format'] === 'csv') {
+        $contentType = 'text/csv';
+    }
+    
     // Send file
-    header('Content-Type: application/octet-stream');
+    header('Content-Type: ' . $contentType);
     header('Content-Disposition: attachment; filename="' . basename($report['file_path']) . '"');
     header('Content-Length: ' . filesize($report['file_path']));
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Pragma: public');
     readfile($report['file_path']);
     exit;
 }
@@ -122,56 +138,78 @@ switch ($method) {
         ]);
         $reportId = $db->lastInsertId();
         
-        // For now, we'll just mark it as generating
-        // In a real application, you'd have a background job/queue system to generate the actual file
+        // Update status to generating
         $stmt = $db->prepare("UPDATE reports SET status = 'generating' WHERE id = ?");
         $stmt->execute([$reportId]);
         
-        // Simulate report generation (in production, this would be done asynchronously)
-        // For demonstration, we'll create a simple text file
-        $reportsDir = __DIR__ . '/../../../uploads/reports';
-        if (!is_dir($reportsDir)) {
-            mkdir($reportsDir, 0755, true);
+        try {
+            $config = require __DIR__ . '/../../../config/config.php';
+            $reportsDir = __DIR__ . '/../../../uploads/reports';
+            
+            if (!is_dir($reportsDir)) {
+                mkdir($reportsDir, 0755, true);
+            }
+            
+            $fileResult = null;
+            
+            // Generate report based on format and type
+            if ($reportFormat === 'excel') {
+                // Use the Excel Report Generator
+                $generator = new ExcelReportGenerator($db);
+                
+                if ($reportType === 'award-marks') {
+                    $fileResult = $generator->generateAwardWiseReport([
+                        'award_id' => !empty($selectedAwards) ? $selectedAwards[0] : null
+                    ]);
+                } elseif ($reportType === 'institution-performance') {
+                    $fileResult = $generator->generateBankWiseReport($filters);
+                } else {
+                    // Default to award-wise
+                    $fileResult = $generator->generateAwardWiseReport($filters);
+                }
+                
+                $filename = $fileResult['filename'];
+                $filePath = $fileResult['filepath'];
+            } else {
+                // For CSV and PDF, generate simplified content
+                $filename = 'report_' . $reportId . '_' . time() . '.' . $reportFormat;
+                $filePath = $reportsDir . '/' . $filename;
+                
+                if ($reportFormat === 'csv') {
+                    $content = generateCSVContent($reportType, $filters, $selectedAwards, $db);
+                    file_put_contents($filePath, $content);
+                } else {
+                    // PDF - for now generate a text placeholder
+                    // In production, use TCPDF or FPDF
+                    $content = generateTextContent($reportType, $filters, $selectedAwards, $db);
+                    file_put_contents($filePath, $content);
+                }
+            }
+            
+            $fileUrl = $config['upload_url'] . 'reports/' . $filename;
+            
+            // Update report with file info
+            $stmt = $db->prepare("UPDATE reports SET file_path = ?, file_url = ?, status = 'completed', generated_at = NOW() WHERE id = ?");
+            $stmt->execute([$filePath, $fileUrl, $reportId]);
+            
+            // Get created report
+            $stmt = $db->prepare("SELECT * FROM reports WHERE id = ?");
+            $stmt->execute([$reportId]);
+            $report = $stmt->fetch();
+            
+            if ($report['filters']) {
+                $report['filters'] = json_decode($report['filters'], true);
+            }
+            
+            Response::success('Report generated successfully', $report, 201);
+            
+        } catch (Exception $e) {
+            // Update report status to failed
+            $stmt = $db->prepare("UPDATE reports SET status = 'failed' WHERE id = ?");
+            $stmt->execute([$reportId]);
+            
+            Response::error('Failed to generate report: ' . $e->getMessage(), null, 500);
         }
-        
-        $filename = 'report_' . $reportId . '_' . time() . '.' . $reportFormat;
-        $filePath = $reportsDir . '/' . $filename;
-        
-        // Generate report content based on type
-        $content = generateReportContent($reportType, $filters, $selectedAwards, $db);
-        
-        // Write file based on format
-        switch ($reportFormat) {
-            case 'csv':
-                file_put_contents($filePath, $content);
-                break;
-            case 'excel':
-                // In production, use a library like PhpSpreadsheet
-                file_put_contents($filePath, $content);
-                break;
-            case 'pdf':
-                // In production, use a library like TCPDF or FPDF
-                file_put_contents($filePath, $content);
-                break;
-        }
-        
-        $config = require __DIR__ . '/../../../config/config.php';
-        $fileUrl = $config['upload_url'] . 'reports/' . $filename;
-        
-        // Update report with file info
-        $stmt = $db->prepare("UPDATE reports SET file_path = ?, file_url = ?, status = 'completed', generated_at = NOW() WHERE id = ?");
-        $stmt->execute([$filePath, $fileUrl, $reportId]);
-        
-        // Get created report
-        $stmt = $db->prepare("SELECT * FROM reports WHERE id = ?");
-        $stmt->execute([$reportId]);
-        $report = $stmt->fetch();
-        
-        if ($report['filters']) {
-            $report['filters'] = json_decode($report['filters'], true);
-        }
-        
-        Response::success('Report generated successfully', $report, 201);
         break;
         
     default:
@@ -179,87 +217,135 @@ switch ($method) {
 }
 
 /**
- * Generate report content (simplified version)
+ * Generate CSV content for reports
  */
-function generateReportContent($reportType, $filters, $selectedAwards, $db) {
-    $content = "Technovation e-Judging System Report\n";
-    $content .= "Report Type: $reportType\n";
-    $content .= "Generated: " . date('Y-m-d H:i:s') . "\n\n";
+function generateCSVContent($reportType, $filters, $selectedAwards, $db) {
+    $output = fopen('php://temp', 'r+');
     
-    switch ($reportType) {
-        case 'award-marks':
-            $content .= "Award Marks Report\n";
-            $content .= "==================\n\n";
-            
-            // Get evaluation data
-            $where = "e.status = 'submitted'";
-            $params = [];
-            
-            if (!empty($filters['institution_id'])) {
-                $where .= " AND e.institution_id = ?";
-                $params[] = $filters['institution_id'];
-            }
-            
-            if (!empty($selectedAwards)) {
-                $placeholders = implode(',', array_fill(0, count($selectedAwards), '?'));
-                $where .= " AND e.award_id IN ($placeholders)";
-                $params = array_merge($params, $selectedAwards);
-            }
-            
-            $stmt = $db->prepare("
-                SELECT e.*, 
-                       i.name as institution_name,
-                       a.category as award_category
-                FROM evaluations e
-                JOIN institutions i ON e.institution_id = i.id
-                JOIN awards a ON e.award_id = a.id
-                WHERE $where
-                ORDER BY e.total_marks DESC
-            ");
-            $stmt->execute($params);
-            $evaluations = $stmt->fetchAll();
-            
-            foreach ($evaluations as $eval) {
-                $content .= sprintf(
-                    "%s - %s: %d marks (%.2f%%)\n",
-                    $eval['institution_name'],
-                    $eval['award_category'],
-                    $eval['total_marks'],
-                    $eval['percentage']
-                );
-            }
-            break;
-            
-        case 'institution-performance':
-            $content .= "Institution Performance Report\n";
-            $content .= "==============================\n\n";
-            
-            $stmt = $db->query("
-                SELECT i.name, 
-                       COUNT(e.id) as total_evaluations,
-                       AVG(e.percentage) as avg_percentage,
-                       MAX(e.total_marks) as max_marks
-                FROM institutions i
-                LEFT JOIN evaluations e ON i.id = e.institution_id AND e.status = 'submitted'
-                GROUP BY i.id
-                ORDER BY avg_percentage DESC
-            ");
-            $performance = $stmt->fetchAll();
-            
-            foreach ($performance as $perf) {
-                $content .= sprintf(
-                    "%s: %.2f%% average (%.0f evaluations)\n",
-                    $perf['name'],
-                    $perf['avg_percentage'] ?? 0,
-                    $perf['total_evaluations'] ?? 0
-                );
-            }
-            break;
-            
-        default:
-            $content .= "Report content for: $reportType\n";
+    // Header row
+    fputcsv($output, ['LANKAPAY TECHNNOVATION AWARDS 2025']);
+    fputcsv($output, ['Generated: ' . date('Y-m-d H:i:s')]);
+    fputcsv($output, []);
+    
+    if ($reportType === 'award-marks') {
+        fputcsv($output, ['Award', 'Category', 'Institution', 'Quantitative (70%)', 'Qualitative (30%)', 'Total (100%)']);
+        
+        // Get evaluation data
+        $stmt = $db->query("
+            SELECT 
+                a.award_number,
+                a.category as award_name,
+                i.name as institution_name,
+                ia.marks as quantitative_score,
+                AVG(e.presentation_score) as avg_presentation,
+                (ia.marks * 0.7 + AVG(e.presentation_score) * 0.3) as total_score
+            FROM institutions i
+            JOIN institution_awards ia ON i.id = ia.institution_id
+            JOIN awards a ON ia.award_id = a.id
+            LEFT JOIN evaluations e ON i.id = e.institution_id AND e.award_id = a.id AND e.status = 'submitted'
+            GROUP BY a.id, i.id
+            ORDER BY a.award_number, total_score DESC
+        ");
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            fputcsv($output, [
+                'Award No. ' . $row['award_number'],
+                $row['award_name'],
+                $row['institution_name'],
+                round($row['quantitative_score'] * 0.7, 2),
+                round($row['avg_presentation'] * 0.3, 2),
+                round($row['total_score'], 2)
+            ]);
+        }
+    } else {
+        // Bank-wise report
+        fputcsv($output, ['Bank Name', 'Awards Participated', 'Average Score', 'Highest Score']);
+        
+        $stmt = $db->query("
+            SELECT 
+                i.name,
+                COUNT(DISTINCT e.award_id) as awards_count,
+                AVG(e.aggregated_score) as avg_score,
+                MAX(e.aggregated_score) as max_score
+            FROM institutions i
+            LEFT JOIN evaluations e ON i.id = e.institution_id AND e.status = 'submitted'
+            WHERE i.status = 'active'
+            GROUP BY i.id
+            ORDER BY avg_score DESC
+        ");
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            fputcsv($output, [
+                $row['name'],
+                $row['awards_count'] ?? 0,
+                round($row['avg_score'] ?? 0, 2),
+                round($row['max_score'] ?? 0, 2)
+            ]);
+        }
     }
+    
+    rewind($output);
+    $content = stream_get_contents($output);
+    fclose($output);
     
     return $content;
 }
 
+/**
+ * Generate text content for PDF placeholder
+ */
+function generateTextContent($reportType, $filters, $selectedAwards, $db) {
+    $content = "LANKAPAY TECHNNOVATION AWARDS 2025\n";
+    $content .= "================================\n\n";
+    $content .= "Report Type: " . ucfirst(str_replace('-', ' ', $reportType)) . "\n";
+    $content .= "Generated: " . date('Y-m-d H:i:s') . "\n\n";
+    
+    if ($reportType === 'award-marks') {
+        $content .= "AWARD-WISE MARKING SCHEME\n";
+        $content .= "--------------------------\n\n";
+        
+        $stmt = $db->query("
+            SELECT 
+                a.award_number,
+                a.category as award_name,
+                i.name as institution_name,
+                e.aggregated_score
+            FROM evaluations e
+            JOIN institutions i ON e.institution_id = i.id
+            JOIN awards a ON e.award_id = a.id
+            WHERE e.status = 'submitted'
+            ORDER BY a.award_number, e.aggregated_score DESC
+        ");
+        
+        $currentAward = '';
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if ($currentAward !== $row['award_number']) {
+                $content .= "\nAward No. " . $row['award_number'] . " - " . $row['award_name'] . "\n";
+                $currentAward = $row['award_number'];
+            }
+            $content .= "  - " . $row['institution_name'] . ": " . round($row['aggregated_score'], 2) . "\n";
+        }
+    } else {
+        $content .= "BANK-WISE PERFORMANCE REPORT\n";
+        $content .= "-----------------------------\n\n";
+        
+        $stmt = $db->query("
+            SELECT 
+                i.name,
+                COUNT(DISTINCT e.award_id) as awards_count,
+                AVG(e.aggregated_score) as avg_score
+            FROM institutions i
+            LEFT JOIN evaluations e ON i.id = e.institution_id AND e.status = 'submitted'
+            WHERE i.status = 'active'
+            GROUP BY i.id
+            ORDER BY avg_score DESC
+        ");
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $content .= $row['name'] . "\n";
+            $content .= "  Awards: " . ($row['awards_count'] ?? 0) . ", Average: " . round($row['avg_score'] ?? 0, 2) . "\n\n";
+        }
+    }
+    
+    return $content;
+}

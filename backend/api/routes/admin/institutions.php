@@ -168,7 +168,8 @@ switch ($method) {
         $name = $input['institutionName'] ?? $input['name'] ?? '';
         $type = $input['type'] ?? 'other';
         $contactPerson = $input['contact_person'] ?? '';
-        $contactEmail = $input['contact_email'] ?? $input['email'] ?? '';
+        // New: institution category (A/B/C/D) - fall back to old email fields if present for compatibility
+        $category = $input['institutionCategory'] ?? $input['institution_category'] ?? $input['category'] ?? $input['contact_email'] ?? $input['email'] ?? '';
         $contactPhone = $input['contact_phone'] ?? '';
         
         // Handle awardCategories - can be JSON string from FormData or array from JSON
@@ -180,7 +181,7 @@ switch ($method) {
         // Debug logging
         error_log("POST /institutions - Received data:");
         error_log("  institutionName: " . ($input['institutionName'] ?? 'N/A'));
-        error_log("  email: " . ($input['email'] ?? 'N/A'));
+        error_log("  category: " . ($category ?? 'N/A'));
         error_log("  awardCategories type: " . gettype($awardCategories));
         error_log("  awardCategories content: " . json_encode($awardCategories));
         
@@ -202,8 +203,10 @@ switch ($method) {
         }
         
         // Insert institution - only fields that exist in database
-        $stmt = $db->prepare("INSERT INTO institutions (name, image_path, image_url, type, contact_person, contact_email, contact_phone) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $imagePath, $imageUrl, $type, $contactPerson, $contactEmail, $contactPhone]);
+        // Insert using the new `institution_category` column instead of `contact_email`.
+        // Keep the rest of the columns the same.
+        $stmt = $db->prepare("INSERT INTO institutions (name, image_path, image_url, type, contact_person, institution_category, contact_phone) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $imagePath, $imageUrl, $type, $contactPerson, $category, $contactPhone]);
         $institutionId = $db->lastInsertId();
         
         // Insert institution awards
@@ -325,7 +328,8 @@ switch ($method) {
         $name = $input['name'] ?? $input['institutionName'] ?? null;
         $type = $input['type'] ?? null;
         $contactPerson = $input['contact_person'] ?? null;
-        $contactEmail = $input['email'] ?? $input['contact_email'] ?? null;
+        // Accept institution category for updates; fallback to legacy fields if present
+        $category = $input['institutionCategory'] ?? $input['institution_category'] ?? $input['category'] ?? $input['email'] ?? $input['contact_email'] ?? null;
         $contactPhone = $input['contact_phone'] ?? null;
         $awardCategories = $input['awardCategories'] ?? [];
         if (is_string($awardCategories)) {
@@ -385,9 +389,9 @@ switch ($method) {
             $updates[] = "contact_person = ?";
             $params[] = $contactPerson;
         }
-        if ($contactEmail !== null) {
-            $updates[] = "contact_email = ?";
-            $params[] = $contactEmail;
+        if ($category !== null) {
+            $updates[] = "institution_category = ?";
+            $params[] = $category;
         }
         if ($contactPhone !== null) {
             $updates[] = "contact_phone = ?";

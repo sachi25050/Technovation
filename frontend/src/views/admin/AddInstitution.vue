@@ -30,19 +30,22 @@
 							/>
 						</a-form-item>
 
-						<a-form-item label="Contact Email">
-							<a-input
+						<a-form-item label="Institution Category">
+							<a-select
 								v-decorator="[
-									'email',
+									'institutionCategory',
 									{
-										rules: [
-											{ required: true, message: 'Please input email!' },
-											{ type: 'email', message: 'Please enter a valid email!' }
-										]
+										rules: [{ required: true, message: 'Please select institution category!' }]
 									}
 								]"
-								placeholder="Enter email (e.g., contact@institution.com)"
-							/>
+								placeholder="Select category (A, B, C, D)"
+								:getPopupContainer="triggerNode => triggerNode.parentNode"
+							>
+								<a-select-option value="A">Category A</a-select-option>
+								<a-select-option value="B">Category B</a-select-option>
+								<a-select-option value="C">Category C</a-select-option>
+								<a-select-option value="D">Category D</a-select-option>
+							</a-select>
 						</a-form-item>
 
 						<a-form-item label="Upload Institute Image">
@@ -240,7 +243,7 @@
 						>
 							<span class="award-name">{{ award.category ? award.category.split(' - ')[0] : (award.award_number || 'Award') }}</span>
 							<a-tag color="blue" class="award-marks-tag">
-								{{ award.marks || 0 }} marks
+								{{ formatMarks(award.marks) }} marks
 							</a-tag>
 						</div>
 					</div>
@@ -291,10 +294,10 @@
 						width: 150
 					},
 					{
-						title: 'Email',
-						dataIndex: 'contact_email',
-						key: 'email',
-						width: 180
+						title: 'Category',
+						dataIndex: 'institution_category',
+						key: 'category',
+						width: 140
 					},
 					{
 						title: 'Image',
@@ -422,7 +425,7 @@
 							// Prepare institution data matching the database schema
 							const institutionData = {
 								name: values.institutionName,
-								email: values.email,
+								category: values.institutionCategory,
 								awardCategories: this.selectedAwards.map(award => ({
 									value: award.value,
 									label: award.label,
@@ -486,6 +489,17 @@
 					other: 'default'
 				};
 				return colors[type] || 'default';
+			},
+			/**
+			 * Format marks to remove unnecessary trailing zeros
+			 * 63.80 -> 63.8, 64.00 -> 64, 63.85 -> 63.85
+			 */
+			formatMarks(marks) {
+				if (marks === null || marks === undefined) return 0;
+				const num = parseFloat(marks);
+				if (isNaN(num)) return 0;
+				// Use parseFloat to remove trailing zeros
+				return parseFloat(num.toFixed(2));
 			},
 			normalizeImageUrl(imageUrl) {
 				if (!imageUrl) return null;
@@ -644,7 +658,7 @@
 			this.$nextTick(() => {
 				this.form.setFieldsValue({
 					institutionName: institution.name,
-					email: institution.contact_email || institution.email
+					institutionCategory: institution.institution_category || institution.category || institution.contact_email || institution.email || null
 				});
 				
 				// Load existing awards if any
