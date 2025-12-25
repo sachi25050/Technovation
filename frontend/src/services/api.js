@@ -235,9 +235,13 @@ class ApiService {
    * @returns {Promise} - API response
    */
   async updateUser(userId, userData, imageFile = null) {
-    // If image file is provided, use FormData
+    // If image file is provided, use FormData with POST + _method override
+    // (PHP doesn't populate $_FILES for PUT requests with multipart/form-data)
     if (imageFile) {
       const formData = new FormData();
+      
+      // Add method override field (same pattern as updateInstitution)
+      formData.append('_method', 'PUT');
       
       // Add all user data fields
       Object.keys(userData).forEach(key => {
@@ -249,7 +253,7 @@ class ApiService {
       // Add image file
       formData.append('profileImage', imageFile);
       
-      // Make request with FormData
+      // Make request with FormData - use POST because PHP doesn't populate $_FILES for PUT requests
       const url = `${API_BASE_URL}/admin/accounts/${userId}`;
       const token = localStorage.getItem('auth_token');
       const headers = {};
@@ -260,7 +264,7 @@ class ApiService {
       // Don't set Content-Type for FormData, browser will set it with boundary
       
       const response = await fetch(url, {
-        method: 'PUT',
+        method: 'POST',
         headers: headers,
         body: formData
       });

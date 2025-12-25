@@ -18,6 +18,12 @@ if ($user['role'] !== 'admin') {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Handle method override for file uploads (PHP doesn't populate $_FILES for PUT requests)
+// Check if this is a POST request with _method=PUT (used for updates with file uploads)
+if ($method === 'POST' && isset($_POST['_method']) && strtoupper($_POST['_method']) === 'PUT') {
+    $method = 'PUT';
+}
+
 // Read raw input once and store it (php://input can only be read once)
 $rawInput = file_get_contents('php://input');
 
@@ -38,10 +44,11 @@ if (($method === 'PUT' || $method === 'PATCH') && empty($input)) {
         $putData = [];
         $putFiles = [];
         
-        // Get boundary from content type
-        preg_match('/boundary=(.*)$/', $contentType, $matches);
+        // Get boundary from content type - handle quoted boundaries and additional parameters
+        preg_match('/boundary=([^;]+)/i', $contentType, $matches);
         if (isset($matches[1])) {
-            $boundary = $matches[1];
+            // Strip quotes if present (boundary may be quoted in Content-Type header)
+            $boundary = trim($matches[1], '"\'');
             
             // Use the already-read raw input (don't read php://input again)
             $rawData = $rawInput;
@@ -57,7 +64,15 @@ if (($method === 'PUT' || $method === 'PATCH') && empty($input)) {
                 if (count($segments) < 2) continue;
                 
                 $headers = $segments[0];
-                $body = rtrim($segments[1], "\r\n");
+                $body = $segments[1];
+                
+                // Remove exactly the trailing \r\n that's part of multipart format
+                // (don't use rtrim as it could remove valid bytes from binary files)
+                if (substr($body, -2) === "\r\n") {
+                    $body = substr($body, 0, -2);
+                } elseif (substr($body, -1) === "\n") {
+                    $body = substr($body, 0, -1);
+                }
                 
                 // Parse Content-Disposition header
                 if (preg_match('/Content-Disposition:.*name="([^"]+)"(?:;\s*filename="([^"]+)")?/i', $headers, $matches)) {

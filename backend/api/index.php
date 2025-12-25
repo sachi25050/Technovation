@@ -46,6 +46,7 @@ $routes = [
     'GET /admin/accounts' => 'admin/accounts.php',
     'GET /admin/accounts/{id}' => 'admin/accounts.php',
     'POST /admin/accounts' => 'admin/accounts.php',
+    'POST /admin/accounts/{id}' => 'admin/accounts.php',  // For updates with file upload (_method=PUT)
     'PUT /admin/accounts/{id}' => 'admin/accounts.php',
     'DELETE /admin/accounts/{id}' => 'admin/accounts.php',
     

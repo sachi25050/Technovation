@@ -607,39 +607,43 @@
 			}
 		},
 
-			editUser(user) {
-				this.isEditMode = true;
-				this.editingUserId = user.id;
+		editUser(user) {
+			this.isEditMode = true;
+			this.editingUserId = user.id;
+			
+			// Reset imageFile to null when entering edit mode
+			// This ensures we don't accidentally send an old file from a previous operation
+			this.imageFile = null;
+			
+			// Populate form with user data
+			this.$nextTick(() => {
+				this.form.setFieldsValue({
+					username: user.username,
+					email: user.email,
+					title: user.title || '',
+					firstName: user.first_name || '',
+					lastName: user.last_name || '',
+					role: user.role,
+					password: '' // Leave password empty, user can set it if needed
+				});
 				
-				// Populate form with user data
-				this.$nextTick(() => {
-					this.form.setFieldsValue({
-						username: user.username,
-						email: user.email,
-						title: user.title || '',
-						firstName: user.first_name || '',
-						lastName: user.last_name || '',
-						role: user.role,
-						password: '' // Leave password empty, user can set it if needed
-					});
-					
-					// Load existing image if any
-					if (user.profile_image) {
-						const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
-						if (user.profile_image.includes('/backend/uploads/')) {
-							const pathMatch = user.profile_image.match(/\/backend\/uploads\/(.+)$/);
-							if (pathMatch && pathMatch[1]) {
-								this.imageUrl = `${apiBaseUrl}/uploads/${pathMatch[1]}`;
-							} else {
-								this.imageUrl = user.profile_image;
-							}
+				// Load existing image if any
+				if (user.profile_image) {
+					const apiBaseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+					if (user.profile_image.includes('/backend/uploads/')) {
+						const pathMatch = user.profile_image.match(/\/backend\/uploads\/(.+)$/);
+						if (pathMatch && pathMatch[1]) {
+							this.imageUrl = `${apiBaseUrl}/uploads/${pathMatch[1]}`;
 						} else {
 							this.imageUrl = user.profile_image;
 						}
 					} else {
-						this.imageUrl = '';
+						this.imageUrl = user.profile_image;
 					}
-				});
+				} else {
+					this.imageUrl = '';
+				}
+			});
 
 				// Scroll to form
 				window.scrollTo({ top: 0, behavior: 'smooth' });
