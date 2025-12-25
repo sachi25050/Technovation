@@ -50,7 +50,10 @@
 									v-decorator="[
 										'presentationWeightage',
 										{
-											rules: [{ required: true, message: 'Please input presentation weightage!' }]
+											rules: [{ required: true, message: 'Please input presentation weightage!' },
+												{ validator: validateTotalWeightage }
+
+											]
 										}
 									]"
 									placeholder="Enter presentation weightage"
@@ -69,7 +72,10 @@
 									v-decorator="[
 										'preliminaryWeightage',
 										{
-											rules: [{ required: true, message: 'Please input preliminary weightage!' }]
+											rules: [{ required: true, message: 'Please input preliminary weightage!' },
+												{ validator: validateTotalWeightage }
+
+											]
 										}
 									]"
 									placeholder="Enter preliminary weightage"
@@ -374,6 +380,25 @@
 			}
 		},
 		methods: {
+			validateTotalWeightage(rule, value, callback) {
+		const presentation = this.form.getFieldValue('presentationWeightage');
+		const preliminary = this.form.getFieldValue('preliminaryWeightage');
+
+		// Only validate when both fields have values
+		if (presentation === undefined || presentation === null || presentation === '' ||
+			preliminary === undefined || preliminary === null || preliminary === '') {
+			callback();
+			return;
+		}
+
+		const total = Number(presentation) + Number(preliminary);
+
+		if (total !== 100) {
+			callback('Total of Presentation and Preliminary weightage should 100%');
+		} else {
+			callback();
+		}
+	},
 			async handleCreateAward() {
 				// Manually validate form fields
 				this.form.validateFields(async (err, values) => {
@@ -476,6 +501,7 @@
 							this.$message.error(error.message || 'Failed to create award. Please try again.');
 						}
 					}
+					
 				});
 			},
 			async handleSubmit(e) {
