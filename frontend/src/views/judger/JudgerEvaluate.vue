@@ -2624,12 +2624,12 @@ import apiService from '@/services/api'
 	
 	&.criteria-header {
 		text-align: left;
-		width: 50%;
+		width: 80%;
 	}
 	
 	&.allocated-header,
 	&.achieved-header {
-		width: 25%;
+		width: 10%;
 	}
 }
 
@@ -3395,12 +3395,12 @@ import apiService from '@/services/api'
 	
 	&.criteria-header {
 		text-align: left;
-		width: 50%;
+		width: 80%;
 	}
 	
 	&.allocated-header,
 	&.achieved-header {
-		width: 25%;
+		width: 10%;
 	}
 	
 	@media (min-width: 768px) {
