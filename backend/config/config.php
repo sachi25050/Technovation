@@ -21,7 +21,7 @@ return [
     
     // JWT Configuration
     'jwt_secret' => $_ENV['JWT_SECRET'] ?? 'your-secret-key-change-in-production',
-    'jwt_expire' => $_ENV['JWT_EXPIRE'] ?? 3600, // 1 hour
+    'jwt_expire' => $_ENV['JWT_EXPIRE'] ?? 31536000, // 1 year (no auto-logout timeout)
     
     // File Upload Configuration
     'upload_path' => __DIR__ . '/../uploads/',
