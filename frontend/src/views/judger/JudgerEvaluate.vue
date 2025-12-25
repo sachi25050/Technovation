@@ -1655,10 +1655,14 @@ import apiService from '@/services/api'
 .judge-field {
 	flex: 1;
 	
-	:deep(.ant-input[disabled]) {
-		color: #000000 !important;
-			-webkit-text-fill-color: #000000 !important;
+	:deep(.ant-input[disabled]),
+	:deep(.ant-input.ant-input-disabled) {
+		color: #1a1a1a !important;
+		-webkit-text-fill-color: #1a1a1a !important;
+		background-color: #f5f5f5 !important;
+		opacity: 1 !important;
 		cursor: default !important;
+		font-weight: 500 !important;
 	}
 }
 

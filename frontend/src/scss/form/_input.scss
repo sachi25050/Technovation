@@ -7,6 +7,15 @@
 	border-radius: 6px;
 }
 
+// Make disabled inputs readable with dark text
+.ant-input[disabled],
+.ant-input.ant-input-disabled,
+.ant-input-disabled {
+	color: #1a1a1a !important;
+	-webkit-text-fill-color: #1a1a1a !important;
+	opacity: 1 !important;
+}
+
 .layout-dashboard-rtl {
 	.header-control {
 		.header-search {
