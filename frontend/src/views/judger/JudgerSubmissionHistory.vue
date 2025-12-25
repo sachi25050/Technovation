@@ -303,22 +303,22 @@ export default {
 		filteredSummaryData() {
 			let filtered = this.summaryData;
 			
-			if (this.categoryFilter) {
-				// Filter by award ID or name
-				const awardName = this.getAwardName(this.categoryFilter);
-				filtered = filtered.filter(entry => 
-					entry.award_id === this.categoryFilter || 
-					entry.award.toLowerCase().includes(awardName.toLowerCase())
-				);
+			if (this.categoryFilter && this.categoryFilter !== '') {
+				// Filter by award ID (use == for type coercion since IDs might be string or number)
+				const filterId = this.categoryFilter;
+				filtered = filtered.filter(entry => {
+					// Compare IDs with loose equality to handle string/number mismatch
+					return entry.award_id == filterId;
+				});
 			}
 			
-			if (this.instituteFilter) {
-				// Filter by institution ID or name
-				const instituteName = this.getInstitutionName(this.instituteFilter);
-				filtered = filtered.filter(entry => 
-					entry.institution_id === this.instituteFilter ||
-					entry.institute.toLowerCase().includes(instituteName.toLowerCase())
-				);
+			if (this.instituteFilter && this.instituteFilter !== '') {
+				// Filter by institution ID (use == for type coercion)
+				const filterId = this.instituteFilter;
+				filtered = filtered.filter(entry => {
+					// Compare IDs with loose equality to handle string/number mismatch
+					return entry.institution_id == filterId;
+				});
 			}
 			
 			return filtered;
