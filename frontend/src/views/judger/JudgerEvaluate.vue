@@ -319,7 +319,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 									<col class="col-checkbox" />
 									<col class="col-institute" />
 									<col class="col-award" />
-									<col v-for="n in 10" :key="'col-c'+n" class="col-criteria" />
+									<col v-for="n in 5" :key="'col-c'+n" class="col-criteria" />
 									<col class="col-pres-score" />
 									<col class="col-volume-score" />
 									<col class="col-aggregate" />
@@ -338,7 +338,7 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 										</th>
 										<th class="th-institute">Institute Name</th>
 										<th class="th-award">Award Category</th>
-										<th v-for="n in 10" :key="'th-c'+n" class="th-criteria">C-{{ String(n).padStart(2, '0') }}</th>
+										<th v-for="n in 5" :key="'th-c'+n" class="th-criteria">C-{{ String(n).padStart(2, '0') }}</th>
 										<th class="th-pres-score">Presentation</th>
 										<th class="th-volume-score">Preliminary</th>
 										<th class="th-aggregate">Aggregate</th>
@@ -377,11 +377,6 @@ Marking Criteria	Allocated	AchievedMarking Criteria	Allocated	AchievedMarking Cr
 										<td class="td-criteria">{{ entry.c3 || '-' }}</td>
 										<td class="td-criteria">{{ entry.c4 || '-' }}</td>
 										<td class="td-criteria">{{ entry.c5 || '-' }}</td>
-										<td class="td-criteria">{{ entry.c6 || '-' }}</td>
-										<td class="td-criteria">{{ entry.c7 || '-' }}</td>
-										<td class="td-criteria">{{ entry.c8 || '-' }}</td>
-										<td class="td-criteria">{{ entry.c9 || '-' }}</td>
-										<td class="td-criteria">{{ entry.c10 || '-' }}</td>
 										<td class="td-pres-score">{{ entry.presentationScore || '-' }}</td>
 										<td class="td-volume-score">{{ entry.volumeWiseScore || '-' }}</td>
 										<td class="td-aggregate">
@@ -1759,14 +1754,17 @@ import apiService from '@/services/api'
 .summary-delete-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 3px;
-	padding: 4px 8px;
+	justify-content: center;
+	gap: 4px;
+	min-width: 80px;
+	height: 32px;
+	padding: 6px 12px;
 	background: #fee2e2;
 	border: 1px solid #fecaca;
-	border-radius: 3px;
+	border-radius: 4px;
 	color: #991b1b;
-	font-size: 10px;
-	font-weight: 500;
+	font-size: 12px;
+	font-weight: 600;
 	cursor: pointer;
 	transition: all 0.2s ease;
 	
@@ -1781,21 +1779,24 @@ import apiService from '@/services/api'
 	}
 	
 	.btn-icon {
-		font-size: 12px;
+		font-size: 14px;
 	}
 }
 
 .summary-edit-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 3px;
-	padding: 4px 10px;
+	justify-content: center;
+	gap: 4px;
+	min-width: 80px;
+	height: 32px;
+	padding: 6px 12px;
 	background: #10b981;
 	border: 1px solid #059669;
-	border-radius: 3px;
+	border-radius: 4px;
 	color: white;
-	font-size: 10px;
-	font-weight: 500;
+	font-size: 12px;
+	font-weight: 600;
 	cursor: pointer;
 	transition: all 0.2s ease;
 	
@@ -1889,7 +1890,7 @@ import apiService from '@/services/api'
 	
 	.institute-name {
 		font-weight: 600;
-		font-size: 10px;
+		font-size: 13px;
 		color: #1E293B;
 		white-space: nowrap;
 		overflow: hidden;
