@@ -51,7 +51,6 @@
 									:getPopupContainer="triggerNode => triggerNode.parentNode"
 								>
 									<a-select-option value="excel">Excel</a-select-option>
-									<a-select-option value="csv">CSV</a-select-option>
 									<a-select-option value="pdf">PDF</a-select-option>
 								</a-select>
 								</a-form-item>
@@ -301,6 +300,11 @@ export default {
 							
 							// Refresh recent reports
 							this.fetchRecentReports();
+							
+							// Automatically download the report
+							if (this.generatedReport && this.generatedReport.id) {
+								await this.downloadReportById(this.generatedReport.id);
+							}
 						} else {
 							this.$message.error(response.message || 'Failed to generate report');
 						}
@@ -454,8 +458,7 @@ export default {
 		getFormatIcon(format) {
 			const icons = {
 				'excel': 'file-excel',
-				'pdf': 'file-pdf',
-				'csv': 'file-text'
+				'pdf': 'file-pdf'
 			};
 			return icons[format] || 'file';
 		},

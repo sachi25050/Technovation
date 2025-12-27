@@ -4,7 +4,8 @@
     "type": "project",
     "require": {
         "php": ">=7.4",
-        "phpoffice/phpspreadsheet": "^1.29"
+        "phpoffice/phpspreadsheet": "^1.29",
+        "mpdf/mpdf": "*"
     },
     "autoload": {
         "psr-4": {
@@ -15,4 +16,3 @@
         "optimize-autoloader": true
     }
 }
-

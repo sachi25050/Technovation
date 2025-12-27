@@ -552,7 +552,9 @@ class ExcelReportGenerator
     }
     
     /**
-     * Generate Bank-wise (Institution Performance) Report
+     * Generate Bank-wise Report
+     * Lists each bank with all their awards and total (100%) scores
+     * Format: Bank Name | Award Description | Total Score (100%) | Rank
      */
     public function generateBankWiseReport($filters = [])
     {
@@ -562,73 +564,203 @@ class ExcelReportGenerator
             ->setTitle('Bank-wise Performance Report')
             ->setSubject('LANKAPAY TECHNNOVATION AWARDS 2025');
         
-        // Create header
+        // Get all institutions with their awards and scores
+        $bankData = $this->getBankWiseData();
+        
+        // Get total number of judges for average calculation
+        $totalJudges = $this->getTotalJudgesCount();
+        
+        // ========== PRE-CALCULATE ALL SCORES AND RANKINGS ==========
+        // First, calculate all scores for all bank-award combinations
+        $awardScores = []; // [award_id => [bank_id => score, ...], ...]
+        foreach ($bankData as $bank) {
+            foreach ($bank['awards'] as $award) {
+                $awardId = $award['id'];
+                if (!isset($awardScores[$awardId])) {
+                    $awardScores[$awardId] = [];
+                }
+                $score = $this->calculateBankAwardScore($bank['id'], $awardId, $totalJudges);
+                $awardScores[$awardId][$bank['id']] = $score;
+            }
+        }
+        
+        // Calculate rankings for each award
+        $awardRankings = []; // [award_id => [bank_id => rank, ...], ...]
+        foreach ($awardScores as $awardId => $bankScoresForAward) {
+            // Sort by score descending
+            arsort($bankScoresForAward);
+            $rank = 1;
+            $awardRankings[$awardId] = [];
+            foreach ($bankScoresForAward as $bankId => $score) {
+                $awardRankings[$awardId][$bankId] = ($score > 0) ? $rank++ : '-';
+            }
+        }
+        
+        // ========== CREATE HEADER SECTION ==========
+        // Title row - Blue theme (matching Award-wise report)
         $this->sheet->setCellValue('A1', 'LANKAPAY TECHNNOVATION AWARDS 2025');
-        $this->sheet->setCellValue('A2', 'BANK-WISE PERFORMANCE REPORT');
-        $this->sheet->mergeCells('A1:F1');
-        $this->sheet->mergeCells('A2:F2');
-        
-        $this->sheet->getStyle('A1:A2')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '006400']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]
+        $this->sheet->mergeCells('A1:E1');
+        $this->sheet->getStyle('A1')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 16, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1565C0']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER]
         ]);
+        $this->sheet->getRowDimension(1)->setRowHeight(30);
         
-        // Column headers
-        $this->sheet->setCellValue('A4', 'Bank Name');
-        $this->sheet->setCellValue('B4', 'Awards Participated');
-        $this->sheet->setCellValue('C4', 'Total Score');
-        $this->sheet->setCellValue('D4', 'Average Score');
-        $this->sheet->setCellValue('E4', 'Highest Score');
-        $this->sheet->setCellValue('F4', 'Rank');
-        
-        $this->sheet->getStyle('A4:F4')->applyFromArray([
-            'font' => ['bold' => true],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'D9EAD3']],
-            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
+        // Subtitle row - Blue theme
+        $this->sheet->setCellValue('A2', 'BANK-WISE MARKING SCHEME');
+        $this->sheet->mergeCells('A2:E2');
+        $this->sheet->getStyle('A2')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '42A5F5']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER]
         ]);
+        $this->sheet->getRowDimension(2)->setRowHeight(24);
         
-        // Get institution performance data
-        $stmt = $this->db->query("
-            SELECT 
-                i.id,
-                i.name,
-                COUNT(DISTINCT e.award_id) as awards_count,
-                SUM(e.aggregated_score) as total_score,
-                AVG(e.aggregated_score) as avg_score,
-                MAX(e.aggregated_score) as max_score
-            FROM institutions i
-            LEFT JOIN evaluations e ON i.id = e.institution_id AND e.status = 'submitted'
-            WHERE i.status = 'active'
-            GROUP BY i.id, i.name
-            ORDER BY avg_score DESC
-        ");
-        $institutions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Column headers row (Row 4)
+        $this->sheet->setCellValue('B4', 'Institution Name');
+        $this->sheet->setCellValue('C4', 'Award Category');
+        $this->sheet->setCellValue('D4', 'Aggregate Mark');
+        $this->sheet->setCellValue('E4', 'Rank');
         
-        $row = 5;
-        $rank = 1;
-        foreach ($institutions as $inst) {
-            $this->sheet->setCellValue('A' . $row, $inst['name']);
-            $this->sheet->setCellValue('B' . $row, $inst['awards_count'] ?? 0);
-            $this->sheet->setCellValue('C' . $row, round($inst['total_score'] ?? 0, 2));
-            $this->sheet->setCellValue('D' . $row, round($inst['avg_score'] ?? 0, 2));
-            $this->sheet->setCellValue('E' . $row, round($inst['max_score'] ?? 0, 2));
-            $this->sheet->setCellValue('F' . $row, $rank);
+        // Style column headers
+        $this->sheet->getStyle('B4:E4')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '000000']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFFFFF']],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER]
+        ]);
+        $this->sheet->getRowDimension(4)->setRowHeight(22);
+        
+        // Start data from row 5
+        $this->currentRow = 5;
+        
+        // Light pastel colors for each bank (rotating through)
+        $bankColors = [
+            'FFCDD2', // Light Red/Pink
+            'FFF9C4', // Light Yellow
+            'C8E6C9', // Light Green
+            'BBDEFB', // Light Blue
+            'E1BEE7', // Light Purple
+            'FFE0B2', // Light Orange
+            'B2DFDB', // Light Teal
+            'F8BBD0', // Light Pink
+            'D7CCC8', // Light Brown
+            'CFD8DC', // Light Blue Grey
+            'DCEDC8', // Light Lime
+            'B3E5FC', // Light Cyan
+        ];
+        
+        // ========== PROCESS EACH BANK ==========
+        $bankIndex = 0;
+        foreach ($bankData as $bank) {
+            $awardCount = count($bank['awards']);
             
-            $this->sheet->getStyle('A' . $row . ':F' . $row)->applyFromArray([
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
-            ]);
+            if ($awardCount === 0) {
+                continue; // Skip banks with no awards
+            }
             
-            $row++;
-            $rank++;
+            // Get color for this bank (cycle through colors)
+            $bankColor = $bankColors[$bankIndex % count($bankColors)];
+            $bankIndex++;
+            
+            // Output each award row for this bank
+            $firstAwardRow = $this->currentRow;
+            foreach ($bank['awards'] as $awardIndex => $award) {
+                $row = $this->currentRow;
+                $awardId = $award['id'];
+                
+                // Bank name only in first row (will be merged later)
+                if ($awardIndex === 0) {
+                    $this->sheet->setCellValue('B' . $row, $bank['name']);
+                    
+                    // Style bank name cell with light color background
+                    $this->sheet->getStyle('B' . $row)->applyFromArray([
+                        'font' => ['bold' => false, 'size' => 10, 'underline' => true, 'color' => ['rgb' => '0000FF']],
+                        'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bankColor]],
+                        'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+                        'alignment' => ['vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true]
+                    ]);
+                }
+                
+                // Award description - use category directly (it should contain full award name)
+                $awardDescription = $award['category'];
+                $this->sheet->setCellValue('C' . $row, $awardDescription);
+                
+                // Get pre-calculated total score
+                $totalScore = $awardScores[$awardId][$bank['id']] ?? 0;
+                
+                // Total score (100%)
+                if ($totalScore !== null && $totalScore > 0) {
+                    $this->sheet->setCellValue('D' . $row, round($totalScore, 2));
+                    
+                    // Style score cell - yellow highlight for high scores (70+), white otherwise
+                    $scoreColor = $totalScore >= 70 ? 'FFFF00' : 'FFFFFF';
+                    $this->sheet->getStyle('D' . $row)->applyFromArray([
+                        'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $scoreColor]],
+                        'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+                        'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
+                        'numberFormat' => ['formatCode' => '0.00']
+                    ]);
+                } else {
+                    // Empty cell with light blue background for missing scores
+                    $this->sheet->getStyle('D' . $row)->applyFromArray([
+                        'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'B8CCE4']],
+                        'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
+                    ]);
+                }
+                
+                // Rank column - show this bank's rank for this award
+                $rank = $awardRankings[$awardId][$bank['id']] ?? '-';
+                $this->sheet->setCellValue('E' . $row, $rank);
+                
+                // Style rank cell - yellow highlight for rank 1, white for others
+                $rankColor = 'FFFFFF';
+                $fontColor = '000000';
+                if ($rank === 1) {
+                    $rankColor = 'FFFF00'; // Bright Yellow for 1st (matching image)
+                    $fontColor = 'FF0000'; // Red text for rank 1
+                }
+                $this->sheet->getStyle('E' . $row)->applyFromArray([
+                    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $rankColor]],
+                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                    'font' => ['bold' => ($rank === 1), 'color' => ['rgb' => $fontColor]]
+                ]);
+                
+                // Style award description cell
+                $this->sheet->getStyle('C' . $row)->applyFromArray([
+                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
+                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER]
+                ]);
+                
+                $this->currentRow++;
+            }
+            
+            // Merge bank name cells if multiple awards
+            if ($awardCount > 1) {
+                $this->sheet->mergeCells('B' . $firstAwardRow . ':B' . ($this->currentRow - 1));
+                $this->sheet->getStyle('B' . $firstAwardRow)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
+                
+                // Apply bank color to merged bank name area
+                $this->sheet->getStyle('B' . $firstAwardRow . ':B' . ($this->currentRow - 1))->applyFromArray([
+                    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bankColor]],
+                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
+                ]);
+            }
+            
+            // Add empty row between banks for visual separation
+            $this->currentRow++;
         }
         
-        // Auto-size columns
-        foreach (range('A', 'F') as $col) {
-            $this->sheet->getColumnDimension($col)->setAutoSize(true);
-        }
+        // ========== SET COLUMN WIDTHS ==========
+        $this->sheet->getColumnDimension('A')->setWidth(5);
+        $this->sheet->getColumnDimension('B')->setWidth(35);
+        $this->sheet->getColumnDimension('C')->setWidth(75);
+        $this->sheet->getColumnDimension('D')->setWidth(12);
+        $this->sheet->getColumnDimension('E')->setWidth(8);
         
-        // Generate file
+        // ========== GENERATE FILE ==========
         $filename = 'Bank_Wise_Report_' . date('Ymd_His') . '.xlsx';
         $filepath = __DIR__ . '/../uploads/reports/' . $filename;
         
@@ -643,6 +775,129 @@ class ExcelReportGenerator
             'filename' => $filename,
             'filepath' => $filepath
         ];
+    }
+    
+    /**
+     * Get all banks with their associated awards
+     */
+    private function getBankWiseData()
+    {
+        // Get all active institutions
+        $stmt = $this->db->query("
+            SELECT id, name 
+            FROM institutions 
+            WHERE status = 'active'
+            ORDER BY name
+        ");
+        $institutions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get awards for each institution
+        foreach ($institutions as &$inst) {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    a.id,
+                    a.award_number,
+                    a.category,
+                    a.presentation_weightage,
+                    a.preliminary_weightage,
+                    ia.marks as quantitative_score,
+                    ia.category as award_category
+                FROM awards a
+                INNER JOIN institution_awards ia ON a.id = ia.award_id AND ia.institution_id = ?
+                WHERE a.status = 'active'
+                ORDER BY CAST(a.award_number AS UNSIGNED), a.award_number
+            ");
+            $stmt->execute([$inst['id']]);
+            $inst['awards'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $institutions;
+    }
+    
+    /**
+     * Calculate total score for a specific bank-award combination
+     * Uses same logic as award-wise report
+     */
+    private function calculateBankAwardScore($institutionId, $awardId, $totalJudges)
+    {
+        // Get quantitative score (preliminary marks) from institution_awards
+        $stmt = $this->db->prepare("
+            SELECT marks as quantitative_score
+            FROM institution_awards 
+            WHERE institution_id = ? AND award_id = ?
+        ");
+        $stmt->execute([$institutionId, $awardId]);
+        $iaData = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $preliminaryMarks = floatval($iaData['quantitative_score'] ?? 0);
+        
+        // Get award weightages
+        $stmt = $this->db->prepare("SELECT presentation_weightage, preliminary_weightage FROM awards WHERE id = ?");
+        $stmt->execute([$awardId]);
+        $award = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $presentationWeight = floatval($award['presentation_weightage'] ?? 30) / 100;
+        
+        // Get judge scores for this institution-award
+        $stmt = $this->db->prepare("
+            SELECT 
+                e.id as evaluation_id,
+                e.presentation_score,
+                e.total_achieved_marks,
+                e.total_allocated_marks,
+                e.percentage,
+                e.status
+            FROM evaluations e
+            WHERE e.institution_id = ? AND e.award_id = ? AND e.status = 'submitted'
+        ");
+        $stmt->execute([$institutionId, $awardId]);
+        $judgeScores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Calculate average judge percentage
+        $sumOfPercentages = 0;
+        foreach ($judgeScores as $score) {
+            $percentage = floatval($score['percentage'] ?? 0);
+            $achieved = floatval($score['total_achieved_marks'] ?? 0);
+            $allocated = floatval($score['total_allocated_marks'] ?? 0);
+            
+            // Calculate percentage if not set
+            if ($percentage == 0 && $achieved > 0) {
+                if ($allocated > 0) {
+                    $percentage = ($achieved / $allocated) * 100;
+                } else {
+                    // Try to get from criteria marks
+                    $criteriaStmt = $this->db->prepare("
+                        SELECT SUM(allocated_marks) as total_allocated, SUM(achieved_marks) as total_achieved
+                        FROM evaluation_criteria_marks 
+                        WHERE evaluation_id = ?
+                    ");
+                    $criteriaStmt->execute([$score['evaluation_id']]);
+                    $criteria = $criteriaStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($criteria && floatval($criteria['total_allocated']) > 0) {
+                        $percentage = (floatval($criteria['total_achieved']) / floatval($criteria['total_allocated'])) * 100;
+                    } else {
+                        $percentage = $achieved;
+                    }
+                }
+            }
+            
+            $sumOfPercentages += $percentage;
+        }
+        
+        // Average across ALL judges (including absent as 0)
+        $averageJudgePercentage = 0;
+        if ($totalJudges > 0) {
+            $averageJudgePercentage = $sumOfPercentages / $totalJudges;
+        }
+        
+        // Calculate weighted qualitative score
+        $qualitativeWeighted = $averageJudgePercentage * $presentationWeight;
+        
+        // Total score = Static Preliminary + Weighted Presentation
+        $totalScore = $preliminaryMarks + $qualitativeWeighted;
+        
+        return $totalScore;
     }
 }
 
