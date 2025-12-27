@@ -30,6 +30,9 @@ class CORS {
         // Set allowed methods and headers for actual requests
         header('Access-Control-Allow-Methods: ' . implode(', ', $corsConfig['allowed_methods']));
         header('Access-Control-Allow-Headers: ' . implode(', ', $corsConfig['allowed_headers']));
+        
+        // Expose headers that are needed for file downloads
+        header('Access-Control-Expose-Headers: Content-Disposition, Content-Length, Content-Type');
     }
 }
 

@@ -17,12 +17,17 @@ require_once __DIR__ . '/../../../core/ExcelReportGenerator.php';
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 $id = isset($_GET['_params'][0]) ? (int)$_GET['_params'][0] : (isset($_GET['params'][0]) ? (int)$_GET['params'][0] : null);
-$action = isset($_GET['_params'][1]) ? $_GET['_params'][1] : (isset($_GET['params'][1]) ? $_GET['params'][1] : null);
+
+// Check if this is a download request by looking at the URI
+$uri = $_SERVER['REQUEST_URI'];
+$isDownloadRequest = strpos($uri, '/download') !== false;
 
 // Handle download action
-if ($action === 'download' && $method === 'GET') {
+if ($isDownloadRequest && $method === 'GET') {
     if (!$id) {
-        Response::error('Report ID is required');
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Report ID is required']);
+        exit;
     }
     
     $stmt = $db->prepare("SELECT * FROM reports WHERE id = ? AND reporter_id = ?");
@@ -30,12 +35,26 @@ if ($action === 'download' && $method === 'GET') {
     $report = $stmt->fetch();
     
     if (!$report) {
-        Response::notFound('Report not found');
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Report not found']);
+        exit;
     }
     
     if ($report['status'] !== 'completed' || !file_exists($report['file_path'])) {
-        Response::error('Report file not available', null, 404);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Report file not available']);
+        exit;
     }
+    
+    // Clear any output buffers
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    // Get file info
+    $filePath = $report['file_path'];
+    $fileName = basename($filePath);
+    $fileSize = filesize($filePath);
     
     // Determine content type based on format
     $contentType = 'application/octet-stream';
@@ -47,13 +66,17 @@ if ($action === 'download' && $method === 'GET') {
         $contentType = 'text/csv';
     }
     
-    // Send file
+    // Send proper headers for file download
     header('Content-Type: ' . $contentType);
-    header('Content-Disposition: attachment; filename="' . basename($report['file_path']) . '"');
-    header('Content-Length: ' . filesize($report['file_path']));
-    header('Cache-Control: no-cache, must-revalidate');
-    header('Pragma: public');
-    readfile($report['file_path']);
+    header('Content-Disposition: attachment; filename="' . $fileName . '"');
+    header('Content-Length: ' . $fileSize);
+    header('Content-Transfer-Encoding: binary');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    
+    // Read and output file
+    readfile($filePath);
     exit;
 }
 
