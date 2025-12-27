@@ -157,27 +157,43 @@ class ExcelReportGenerator
         $stmt->execute([$awardId]);
         $institutions = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        // Get total number of judges in the system (for average calculation)
+        $totalJudges = $this->getTotalJudgesCount();
+        
         // Get judge scores for each institution (may be empty if not evaluated)
         foreach ($institutions as &$inst) {
             $inst['judge_scores'] = $this->getJudgeScoresForInstitution($inst['id'], $awardId);
-            $inst['calculated'] = $this->calculateScores($inst, $awardId);
+            $inst['calculated'] = $this->calculateScores($inst, $awardId, $totalJudges);
         }
         
         return $institutions;
     }
     
     /**
+     * Get total number of active judges in the system
+     */
+    private function getTotalJudgesCount()
+    {
+        $stmt = $this->db->query("SELECT COUNT(*) as count FROM users WHERE role = 'judger' AND status = 'active'");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return intval($result['count'] ?? 1);
+    }
+    
+    /**
      * Get individual judge scores for an institution
+     * Also calculates actual percentage from criteria marks if needed
      */
     private function getJudgeScoresForInstitution($institutionId, $awardId)
     {
         $stmt = $this->db->prepare("
             SELECT 
+                e.id as evaluation_id,
                 e.judge_id,
                 u.id as user_id,
                 CONCAT(COALESCE(u.title, ''), ' ', COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as judge_name,
                 e.presentation_score,
                 e.total_achieved_marks,
+                e.total_allocated_marks,
                 e.percentage,
                 e.status
             FROM evaluations e
@@ -186,17 +202,60 @@ class ExcelReportGenerator
             ORDER BY u.first_name
         ");
         $stmt->execute([$institutionId, $awardId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $scores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // For each score, ensure we have a valid percentage
+        // If percentage is 0 or invalid, calculate from criteria marks
+        foreach ($scores as &$score) {
+            $percentage = floatval($score['percentage'] ?? 0);
+            $achieved = floatval($score['total_achieved_marks'] ?? 0);
+            $allocated = floatval($score['total_allocated_marks'] ?? 0);
+            
+            // If percentage is 0 but we have marks, calculate it
+            if ($percentage == 0 && $achieved > 0) {
+                if ($allocated > 0) {
+                    $percentage = ($achieved / $allocated) * 100;
+                } else {
+                    // Try to get allocated from criteria marks table
+                    $criteriaStmt = $this->db->prepare("
+                        SELECT SUM(allocated_marks) as total_allocated, SUM(achieved_marks) as total_achieved
+                        FROM evaluation_criteria_marks 
+                        WHERE evaluation_id = ?
+                    ");
+                    $criteriaStmt->execute([$score['evaluation_id']]);
+                    $criteria = $criteriaStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($criteria && floatval($criteria['total_allocated']) > 0) {
+                        $allocated = floatval($criteria['total_allocated']);
+                        $achieved = floatval($criteria['total_achieved']);
+                        $percentage = ($achieved / $allocated) * 100;
+                    } else {
+                        // Last resort: assume achieved marks ARE the percentage
+                        $percentage = $achieved;
+                    }
+                }
+            }
+            
+            // Store the calculated percentage
+            $score['calculated_percentage'] = round($percentage, 2);
+        }
+        
+        return $scores;
     }
     
     /**
      * Calculate scores following the specification formula
      * - Preliminary marks are STATIC (already the final weighted value entered by admin)
-     * - Average Judge Score = Sum(Valid Total Marks) / Count(Valid Judges) [excluding "Ab"]
-     * - Qualitative Weight = Average * presentation_weightage%
+     * - Average Judge Score = Sum(All Judge Percentages) / TOTAL Number of Judges
+     *   IMPORTANT: Absent judges (Ab) count as 0 and are INCLUDED in the divisor
+     * - Qualitative Weight = Average Percentage × presentation_weightage%
      * - Total = Preliminary (static) + Qualitative (weighted)
+     * 
+     * @param array $institution Institution data with judge_scores
+     * @param int $awardId Award ID
+     * @param int $totalJudges Total number of judges in the system (including absent)
      */
-    private function calculateScores($institution, $awardId)
+    private function calculateScores($institution, $awardId, $totalJudges = 1)
     {
         $judgeScores = $institution['judge_scores'];
         // Preliminary marks are STATIC - use as entered (already the 70% weighted value)
@@ -209,24 +268,33 @@ class ExcelReportGenerator
         
         $presentationWeight = floatval($award['presentation_weightage'] ?? 30) / 100;
         
-        // Calculate average of judge scores (excluding absent judges)
-        // Use total_achieved_marks (total marks given by judge)
-        $validScores = [];
+        // Sum up all judge percentages (judges who submitted)
+        // Absent judges are treated as 0
+        $sumOfPercentages = 0;
+        $submittedCount = 0;
         foreach ($judgeScores as $score) {
             // Check if judge was present (has a valid score)
             if ($score['status'] === 'submitted' && $score['total_achieved_marks'] !== null) {
-                $validScores[] = floatval($score['total_achieved_marks']);
+                // Use the calculated percentage (handles all edge cases)
+                $judgePercentage = floatval($score['calculated_percentage'] ?? $score['percentage'] ?? 0);
+                $sumOfPercentages += $judgePercentage;
+                $submittedCount++;
             }
+            // Absent judges contribute 0 to the sum (implicitly)
         }
         
-        $averageJudgeScore = 0;
-        if (count($validScores) > 0) {
-            $averageJudgeScore = array_sum($validScores) / count($validScores);
+        // Calculate average percentage across ALL judges (including absent as 0)
+        // Divide by TOTAL number of judges, not just those who submitted
+        $averageJudgePercentage = 0;
+        if ($totalJudges > 0) {
+            $averageJudgePercentage = $sumOfPercentages / $totalJudges;
         }
         
         // Calculate weighted qualitative score (presentation)
-        // Average judge total marks × presentation weightage (e.g., 30%)
-        $qualitativeWeighted = $averageJudgeScore * $presentationWeight;
+        // Average judge percentage × presentation weightage (e.g., 30%)
+        // Formula: (Sum / TotalJudges) × weight%
+        // Example: (94 / 5) × 30% = 18.8 × 0.30 = 5.64
+        $qualitativeWeighted = $averageJudgePercentage * $presentationWeight;
         
         // Preliminary marks are STATIC - do NOT multiply by weight again
         // They're already the final 70% value as entered by admin
@@ -238,10 +306,11 @@ class ExcelReportGenerator
         return [
             'quantitative_raw' => $preliminaryMarks,
             'quantitative_weighted' => $quantitativeWeighted,  // Same as raw (static)
-            'average_judge_score' => $averageJudgeScore,
+            'average_judge_score' => $averageJudgePercentage,  // Average percentage (sum / total judges)
             'qualitative_weighted' => $qualitativeWeighted,
             'total_score' => $totalScore,
-            'valid_judges_count' => count($validScores),
+            'submitted_judges_count' => $submittedCount,
+            'total_judges_count' => $totalJudges,
             'presentation_weight' => $presentationWeight
         ];
     }
@@ -277,6 +346,10 @@ class ExcelReportGenerator
      */
     private function createAwardSection($award, $judges)
     {
+        // Get the actual weightages for this award
+        $preliminaryWeightage = intval($award['preliminary_weightage'] ?? 70);
+        $presentationWeightage = intval($award['presentation_weightage'] ?? 30);
+        
         // Award title row - Light Blue theme
         $awardTitle = "Award No. " . $award['award_number'] . " - " . $award['category'];
         $this->sheet->setCellValue('A' . $this->currentRow, $awardTitle);
@@ -287,12 +360,12 @@ class ExcelReportGenerator
         ]);
         $this->currentRow++;
         
-        // Column headers row
+        // Column headers row - Use DYNAMIC weightages from the award
         $headerRow = $this->currentRow;
         $this->sheet->setCellValue('A' . $headerRow, 'Awards Category');
         $this->sheet->setCellValue('B' . $headerRow, 'Name');
-        $this->sheet->setCellValue('C' . $headerRow, '70%');
-        $this->sheet->setCellValue('D' . $headerRow, '30%');
+        $this->sheet->setCellValue('C' . $headerRow, $preliminaryWeightage . '%');
+        $this->sheet->setCellValue('D' . $headerRow, $presentationWeightage . '%');
         $this->sheet->setCellValue('E' . $headerRow, '100%');
         
         // Judge columns
@@ -375,7 +448,7 @@ class ExcelReportGenerator
         // Total score (100%)
         $this->sheet->setCellValue('E' . $row, round($calc['total_score'], 1));
         
-        // Individual judge scores
+        // Individual judge scores - display percentage for each judge
         $judgeScoresMap = [];
         foreach ($institution['judge_scores'] as $score) {
             $judgeScoresMap[$score['judge_id']] = $score;
@@ -387,8 +460,10 @@ class ExcelReportGenerator
             
             if (isset($judgeScoresMap[$judge['id']])) {
                 $score = $judgeScoresMap[$judge['id']];
-                // Use total_achieved_marks instead of presentation_score
-                $this->sheet->setCellValue($colLetter . $row, round($score['total_achieved_marks'], 0));
+                // Use the calculated percentage (computed in getJudgeScoresForInstitution)
+                $judgePercentage = floatval($score['calculated_percentage'] ?? $score['percentage'] ?? 0);
+                
+                $this->sheet->setCellValue($colLetter . $row, round($judgePercentage, 0));
                 
                 // Light GREEN background for submitted marks
                 $this->sheet->getStyle($colLetter . $row)->applyFromArray([
